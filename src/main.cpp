@@ -1,6 +1,8 @@
 #include <_main.hpp>
+#include <fs.hpp>
 
 #include <SahderLayer.hpp>
+#include <ViewportLayer.hpp>
 
 #define in_range(a, m, t) (a >= m and a <= t)
 
@@ -102,6 +104,11 @@ class $modify(PlayerObjectExt, PlayerObject) {
 
 			this->m_robotBurstParticles->setVisible(0);
 		}
+
+		if (m_holdingLeft or m_holdingRight) {
+			m_isPlatformer = 1;
+			if (m_gameLayer) m_gameLayer->m_isPlatformer = 1;
+		}
 	}
 	void updateRotation(float p0) {
 		if (this->isCube()) {
@@ -163,7 +170,7 @@ class $modify(PlayerObjectExt, PlayerObject) {
 class $modify(CCMenuItemSpriteExtraExt, CCMenuItemSpriteExtra) {
 	$override void selected() {
 		if (m_selectSound.empty()) this->m_selectSound = "btnClick.ogg";
-		if (auto spr = typeinfo_cast<CCSprite*>(this->getNormalImage())) {
+		if (auto spr = typeinfo_cast<CCNodeRGBA*>(this->getNormalImage())) {
 			spr->setCascadeColorEnabled(1);
 			spr->setCascadeOpacityEnabled(1);
 			if (spr->getColor() == ccWHITE) {
@@ -177,33 +184,44 @@ class $modify(CCMenuItemSpriteExtraExt, CCMenuItemSpriteExtra) {
 
 #include <Geode/modify/GManager.hpp>
 class $modify(ResourcesLoader, GManager) {
-	static void replaceFrames() {
-		auto rpl = [](const char* name, const char* texture = "")
-			{
-				auto a = fmt::format("{}"_spr, std::string(texture).empty() ? name : texture);
-				auto sprite = CCSprite::create(a.c_str());
-				if (sprite) CCSpriteFrameCache::get()->addSpriteFrame(
-					sprite->displayFrame(), name
-				);
-			};
-		rpl("GJ_table_bottom_001.png");
-		rpl("GJ_table_side_001.png");
-		rpl("GJ_table_top_001.png");
-		rpl("GJ_topBar_001.png");
-		rpl("GJ_sideArt_001.png");
-		rpl("GJ_infoIcon_001.png");
-		rpl("GJ_arrow_01_001.png", "_GoBackBtn.png");
-		//rpl("GJ_arrow_02_001.png", "_GoBackBtn.png");
-		rpl("GJ_arrow_03_001.png", "_GoBackBtn.png");
-	}
 	$override void setup() {
+
+		//for ui.blah.json to ui/blah.json as example
+		for (auto& p : fs::glob::glob(getMod()->getResourcesDir().string() + "/*.*.*")) {
+			auto name = p.filename().string();
+			std::reverse(name.begin(), name.end());
+			auto should_replace = false;
+			for (auto& ch : name) {
+				ch = (ch == '.' and should_replace) ? '/' : ch;
+				should_replace = (ch == '.') ? true : should_replace;
+			}
+			std::reverse(name.begin(), name.end());
+			auto todvde = std::filesystem::path(name);
+			auto newp = p.parent_path() / todvde.parent_path();
+			std::filesystem::create_directories(newp, fs::last_err_code);
+			std::filesystem::rename(p, newp / todvde.filename(), fs::last_err_code);
+		}
+
 		CCFileUtils::sharedFileUtils()->addPriorityPath(
-			Mod::get()->getResourcesDir().string().c_str()
+			getMod()->getResourcesDir().string().c_str()
 		);
+
 		GManager::setup();
 	}
 };
 
+#include <Geode/modify/CCSpriteFrameCache.hpp>
+class $modify(CCSpriteFrameCacheExt, CCSpriteFrameCache) {
+	CCSpriteFrame* spriteFrameByName(const char* pszName) {
+		//log::debug("{}({})", __FUNCTION__, pszName);
+		auto frameAtSprExtName = (Mod::get()->getID() + "/" + pszName);
+		auto frameAtSprExt = CCSpriteFrameCache::get()->m_pSpriteFrames->objectForKey(frameAtSprExtName);
+		auto rtn = CCSpriteFrameCache::spriteFrameByName(
+			frameAtSprExt ? frameAtSprExtName.data() : pszName
+		);
+		return rtn;
+	};
+};
 
 #include <Geode/modify/GameManager.hpp>
 class $modify(GameManagerExt, GameManager) {
@@ -238,6 +256,13 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 	};
 	bool init(bool p0) {
 		if (!LoadingLayer::init(p0)) return false;
+		
+		static bool volume_preloaded = 0;
+		if (volume_preloaded) void();
+		else FMODAudioEngine::get()->setBackgroundMusicVolume(GameManager::get()->m_bgVolume);//xd
+		volume_preloaded = 1;
+
+		GameManager::get()->fadeInMusic("WaitingTheme.mp3");
 		
 		findFirstChildRecursive<CCLabelBMFont>(
 			this, [this](CCLabelBMFont* node) {
@@ -281,6 +306,25 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 			this->addChild(loading_bg);
 		}
 
+		{
+			auto verLabel = CCLabelBMFont::create(
+				fmt::format(
+					"SDK {} at {} Platform, Release {}",
+					Mod::get()->getVersion().toVString(),
+					GEODE_PLATFORM_NAME,
+					Mod::get()->getMetadata().getGeodeVersion().toVString()
+				).c_str(),
+				"gjFont30.fnt",
+				kCCTextAlignmentLeft
+			);
+			verLabel->limitLabelWidth(92.f, 0.5f, 0.1f);
+			verLabel->setPositionY(this->getContentHeight()); 
+			verLabel->setScale(0.337f);
+			verLabel->setAnchorPoint(CCPointMake(-0.12f, 2.1f));
+			verLabel->setOpacity(77);
+			this->addChild(verLabel);
+		};
+
 		this->schedule(schedule_selector(LoadingLayerExt::upd));
 		return !false;
 	};
@@ -290,14 +334,8 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 class $modify(MenuLayerExt, MenuLayer) {
 	void upd(float) {
 		if (not this) return; 
-		if (auto pos = getMousePos(); !pos.isZero()) {
-			pos = this->convertToNodeSpace(pos);
-			this->setAnchorPoint(pos / this->getContentSize());
-			this->getScale() == 1.f ? this->setScale(1.01f) : void();
-		};
 	}
 	bool init() {
-		ResourcesLoader::replaceFrames();
 		if (!MenuLayer::init()) return false;
 
 		if (1) findFirstChildRecursive<CCNode>(
@@ -314,34 +352,85 @@ class $modify(MenuLayerExt, MenuLayer) {
 		auto menu = CCMenu::create();
 		menu->setID("menu"_spr);
 
-		menu->addChild(SimpleTextArea::create("Umbral Abyss", "gjFont30.fnt", 1.0f), 0, 56829);
+		menu->addChild(SimpleTextArea::create(getMod()->getName(), "gjFont30.fnt", 1.0f), 0, 56829);
 		menu->getChildByTag(56829)->addChild(SahderLayer::create("basic.vsh", "menuListTitle.fsh"));
 
-#define menu_button_as_label(name, id) { \
-auto item = CCMenuItemExt::createSpriteExtra(\
-	SimpleTextArea::create(name, "gjFont30.fnt", 0.6f), [this](CCNode*) {\
-		auto button_node = (this ? this : CCNode::create())->getChildByIDRecursive(id);\
-		if (button_node) if (auto cast = typeinfo_cast<CCMenuItem*>(button_node)) cast->activate();\
-	}\
-);\
-item->setCascadeColorEnabled(1);\
-item->setAnchorPoint({0.f, 0.5f});\
-menu->addChild(item);\
+#define menu_item_to_link_label(name, id) {															\
+auto TAR_NAME = std::string(name); auto TAR_ID = std::string(id);									\
+auto item = CCMenuItemExt::createSpriteExtra(														\
+	SimpleTextArea::create(TAR_NAME, "bigFont.fnt", 0.6f)->getLines()[0],							\
+	[this, TAR_NAME, TAR_ID](CCNode*) {																\
+		auto button_node = (this ? this : CCNode::create())->getChildByIDRecursive(TAR_ID);			\
+		if (button_node) if (auto cast = typeinfo_cast<CCMenuItem*>(button_node)) cast->activate();	\
+	}																								\
+);																									\
+item->setCascadeColorEnabled(1);																	\
+item->setAnchorPoint({0.f, 0.5f});																	\
+menu->addChild(item);																				\
 }
-		menu_button_as_label("play", "play-button");
-		menu_button_as_label("editor ~", "editor-button");
-		menu_button_as_label("settings", "settings-button");
-		menu_button_as_label("geode", "geode.loader/geode-button");
 
-		menu->addChild(SimpleTextArea::create("   ", "gjFont30.fnt", 1.0f));
+#define menu_item_label(text, func, ...) {											\
+auto TAR_TEXT = std::string(text); auto item = CCMenuItemExt::createSpriteExtra(	\
+	SimpleTextArea::create(TAR_TEXT, "bigFont.fnt", 0.6f)->getLines()[0], func		\
+);																					\
+item->setCascadeColorEnabled(1);													\
+item->setAnchorPoint({0.f, 0.5f});													\
+menu->addChild(item); __VA_ARGS__													\
+}
+		menu_item_to_link_label("play", "play-button");
+		menu_item_to_link_label("settings", "settings-button");
+		menu_item_to_link_label("geode", "geode.loader/geode-button");
 
-		menu_button_as_label("quit", "close-button");
+		menu->addChild(SimpleTextArea::create("   ", "bigFont.fnt", 1.0f));
 
-		menu->setLayout(ColumnLayout::create()->setAxisReverse(1));
+		{ 
+			auto item = CCMenuItemExt::createSpriteExtra(
+				SimpleTextArea::create("more", "bigFont.fnt", 0.6f)->getLines()[0],
+				[this](CCNode*) {
+					if (auto a = this->getChildByID("submenu"_spr)) {
+						if (a->getChildByID("more-submenu"_spr)) return a->removeFromParentAndCleanup(0);
+						a->removeFromParentAndCleanup(0);
+					}
+					auto menu = CCMenu::create();
+					menu->setID("menu"_spr);
+
+					findFirstChildRecursive<CCMenuItem>(
+						this, [this, menu](CCMenuItem* founded_item) {
+							menu_item_to_link_label(nodeName(founded_item), founded_item->getID());
+							return false;
+						}
+					);
+
+					menu->setLayout(ColumnLayout::create()
+						->setAxisReverse(1)
+						->setGap(-5.000f)
+						->setCrossAxisLineAlignment(AxisAlignment::End)
+					);
+
+					auto submenu_scroll = ScrollLayer::create({ 860.f, 235.f });
+					submenu_scroll->m_cutContent = 0;
+					submenu_scroll->m_contentLayer->addChild(menu);
+					submenu_scroll->m_contentLayer->setContentHeight(menu->getContentHeight());
+					submenu_scroll->scrollToTop();
+					submenu_scroll->setID("submenu"_spr);
+					submenu_scroll->setZOrder(-1);
+					submenu_scroll->addChild(createDataNode("more-submenu"_spr));
+					submenu_scroll->runAction(CCEaseExponentialOut::create(CCMoveBy::create(0.5f, ccp(6, 0))));
+					this->addChildAtPosition(submenu_scroll, Anchor::BottomLeft, { -108.f - 6, 0.f }, 0);
+				}
+			); 
+			item->setCascadeColorEnabled(1); 
+			item->setAnchorPoint({ 0.f, 0.5f }); 
+			menu->addChild(item); 
+		};
+
+		menu_item_to_link_label("quit", "close-button");
+
+		menu->setLayout(ColumnLayout::create()->setAxisReverse(1)->setCrossAxisLineAlignment(AxisAlignment::Start));
 		menu->setAnchorPoint({ 0.f, 0.5f });
 		this->addChildAtPosition(menu, Anchor::Left, {66.6f,0}, 0);
 
-		menu->addChild(SahderLayer::create("basic.vsh", "menu.fsh"));
+		//menu->addChild(SahderLayer::create("basic.vsh", "menu.fsh"));
 
 		//bg
 		auto bg = CCLayer::create();
@@ -394,29 +483,7 @@ menu->addChild(item);\
 		bg2->setPosition(CCPointMake(305.f, 297.f));
 		bg->addChild(bg2);
 
-		auto overlay = CCSprite::create("overlay1.png"_spr);
-		if (overlay) {
-			overlay->setID("overlay"_spr);
-			overlay->setAnchorPoint(CCPointMake(0.f, 0.f));
-			queueInMainThread([this, overlay]
-				{
-					overlay->setScaleX(
-						getParent()->getContentWidth() / overlay->getContentWidth()
-					);
-					overlay->setScaleY(
-						getParent()->getContentHeight() / overlay->getContentHeight()
-					);
-					this->getParent()->addChild(overlay);
-				});
-
-			auto frames = CCArray::create();
-			for (int i = 1; i <= 3; i++) if (auto sprite = CCSprite::create(
-				fmt::format("{}/overlay{}.png", GEODE_MOD_ID, i).data()
-			)) frames->addObject(sprite->displayFrame());
-			else log::warn("there is no {}/overlay{}.png", GEODE_MOD_ID, i);
-			overlay->runAction(CCRepeatForever::create(CCAnimate::create(CCAnimation::createWithSpriteFrames(frames, 0.01))));
-			overlay->runAction(CCRepeatForever::create(CCShaky3D::create(10.f, { 12,12 }, 3, 1)));
-		};
+		this->addChild(SahderLayer::create("basic.vsh", "menu.fsh"), 1, 1337);
 
 		this->schedule(schedule_selector(MenuLayerExt::upd));
 		return true;

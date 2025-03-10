@@ -85,16 +85,16 @@ public:
 		auto parent = this->getParent();
 		if (!parent) return;
 
-		if (CCDirector::get()->getWinSize() != m_renderTexture->getContentSize()) {
+		if (parent->getContentSize() != m_renderTexture->getContentSize()) {
 			m_renderTexture->initWithWidthAndHeight(
-				CCDirector::get()->getWinSize().width,
-				CCDirector::get()->getWinSize().height,
+				parent->getContentSize().width,
+				parent->getContentSize().height,
 				kTexture2DPixelFormat_RGBA8888
 			);
-			m_renderTexture->setContentSize(CCDirector::get()->getWinSize());
+			m_renderTexture->setContentSize(parent->getContentSize());
 		}
 
-		bool oldVisible = this->isVisible();
+		bool myOldVisible = this->isVisible();
 		this->setVisible(false);
 
 		m_renderTexture->clear(0, 0, 0, 0);
@@ -102,7 +102,7 @@ public:
 		parent->visit();
 		m_renderTexture->end();
 
-		this->setVisible(oldVisible);
+		this->setVisible(myOldVisible);
 
 		this->initWithSpriteFrame(CCSpriteFrame::createWithTexture(
 			m_renderTexture->getSprite()->getTexture(),
@@ -133,9 +133,16 @@ public:
 		GLint timeLocation = glGetUniformLocation(m_shaderProgram->getProgram(), "time");
 		glUniform1f(timeLocation, m_time);
 
-		auto winSize = this->getParent()->getContentSize();
+		GLint u_timeLocation = glGetUniformLocation(m_shaderProgram->getProgram(), "u_time");
+		glUniform1f(u_timeLocation, m_time);
+
+		auto winSize = this->getParent() ? this->getParent()->getContentSize() : CCSizeMake(0, 0);
+
 		GLint resolutionLoc = glGetUniformLocation(m_shaderProgram->getProgram(), "resolution");
 		glUniform2f(resolutionLoc, winSize.width, winSize.height);
+
+		GLint u_resolutionLoc = glGetUniformLocation(m_shaderProgram->getProgram(), "u_resolution");
+		glUniform2f(u_resolutionLoc, winSize.width, winSize.height);
 
 		m_onDrawEnd();
 

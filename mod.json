@@ -21,6 +21,11 @@
 			"id": "geode.node-ids",
 			"version": ">=v1.13.1",
 			"importance": "required"
+		},
+		{
+			"id": "alphalaneous.happy_textures",
+			"version": ">=v1.9.2",
+			"importance": "required"
 		}
 	],
 	"resources": {
@@ -29,6 +34,11 @@
 		],
 		"sprites": [
 			"assets/sprites/**/*.*"
-		]
+		],
+		"spritesheets": {
+			"spritesheet": [
+				"assets/spritesheet/**/*.png"
+			]
+		}
 	}
 }

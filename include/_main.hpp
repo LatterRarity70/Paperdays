@@ -30,6 +30,21 @@ template<typename T, typename U> constexpr size_t OFFSET_BY_MEMBER(U T::* member
 
 #define LOG_THIS_FILE $execute { log::debug("LOG_THIS_FILE: \n\n{}\n", fs::path(__FILE__).filename().string()); }
 
+namespace geode::utils::string {
+    inline std::vector<std::string> explode(std::string separator, std::string input) {
+        std::vector<std::string> vec;
+        for (int i{ 0 }; i < input.length(); ++i) {
+            int pos = input.find(separator, i);
+            if (pos < 0) { vec.push_back(input.substr(i)); break; }
+            int count = pos - i;
+            vec.push_back(input.substr(i, count));
+            i = pos + separator.length() - 1;
+        }
+        if (vec.size() == 0) vec.push_back(input);
+        return vec;
+    }
+}
+
 namespace geode::cocos {
     inline std::string getFrameName(CCNode* node, bool textureName = false) {
         if (node == nullptr) return "NIL_NODE";
@@ -72,22 +87,35 @@ namespace geode::cocos {
         //if (!node) log::warn("FAILED TO FIND DATA NODE! id: {}", id);
         return node;
     }
-};
-
-namespace geode::utils::string {
-    inline std::vector<std::string> explode(std::string separator, std::string input) {
-        std::vector<std::string> vec;
-        for (int i{ 0 }; i < input.length(); ++i) {
-            int pos = input.find(separator, i);
-            if (pos < 0) { vec.push_back(input.substr(i)); break; }
-            int count = pos - i;
-            vec.push_back(input.substr(i, count));
-            i = pos + separator.length() - 1;
+    inline auto nodeName(CCNode* of) {
+        auto rtn = of->getID();
+        if (rtn.empty()) rtn = getFrameName(of);
+        if (string::contains(rtn, "resources/")) {
+            auto slExpl = string::explode("/", rtn);
+            rtn = slExpl[slExpl.size() - 1];
         }
-        if (vec.size() == 0) vec.push_back(input);
-        return vec;
+        auto slExpl = string::explode("/", rtn);
+        rtn = slExpl[slExpl.size() - 1];
+        rtn = string::toUpper(rtn);
+        rtn = string::replace(rtn, "-BUTTON-", "");
+        rtn = string::replace(rtn, "-BUTTON", "");
+        rtn = string::replace(rtn, "001", " ");
+        rtn = string::replace(rtn, "GJ_", " ");
+        rtn = string::replace(rtn, "-ROUND", " ");
+        rtn = string::replace(rtn, "_ROUND", " ");
+        rtn = string::replace(rtn, "-LOGO", " ");
+        rtn = string::replace(rtn, "_LOGO", " ");
+        rtn = string::replace(rtn, "-UHD", " ");
+        rtn = string::replace(rtn, "-HD", " ");
+        rtn = string::replace(rtn, "_ICON", " ");
+        rtn = string::replace(rtn, ".PNG", " ");
+        rtn = string::replace(rtn, "-", " ");
+        rtn = string::replace(rtn, "_", " ");
+        rtn = string::replace(rtn, "   ", "");
+        rtn = string::replace(rtn, "  ", "");
+        return (rtn);
     }
-}
+};
 
 #include  <random>
 #include  <iterator>
