@@ -4,163 +4,64 @@
 #include <SahderLayer.hpp>
 #include <ViewportLayer.hpp>
 
-#define in_range(a, m, t) (a >= m and a <= t)
+#include <player.hpp>
+#include <resources.hpp>
 
-#include <Geode/modify/GJBaseGameLayer.hpp>
-class $modify(GJBaseGameLayerSoundEvents, GJBaseGameLayer) {
-	void gameEventTriggered(GJGameEvent p0, int p1, int p2) {
-		auto eventID = static_cast<int>(p0);
-		auto audio = FMODAudioEngine::get();
-		if (eventID >= 1 and eventID <= 5) {//landing
-			audio->playEffect("step_landing.ogg", 1.f, 1.f / eventID, 0.9f + (eventID / 10));
-		}
-		if (eventID >= 12 and eventID <= 13) {//jump
-			audio->playEffect("step_jump.ogg", 1.f, 1.f, 1.f);
-		}
-		if (eventID == 23) {//dash
-			auto dashes = {
-				"dash1.ogg","dash2.ogg","dash3.ogg","dash4.ogg","dash5.ogg"
+class PartSelector : public CCLayer {
+	public:
+	CREATE_FUNC(PartSelector);
+	virtual void keyBackClicked(void) override {
+		auto asd = CreatorLayer::create();
+		asd->onBack(nullptr);
+		asd->release();
+	}
+	virtual bool init() override {
+		if (!CCLayer::init()) return false;
+
+		this->setTouchEnabled(1);
+		this->setKeyboardEnabled(1);
+		this->setKeypadEnabled(1);
+
+		auto menu = CCMenu::create();
+
+		auto back = CCMenuItemExt::createSpriteExtraWithFrameName(
+			"GJ_arrow_01_001.png", 1.0f, [this](CCNode* ADs) { this->keyBackClicked(); }
+		);
+		menu->addChildAtPosition(back, Anchor::TopLeft, { 36, -36 });
+
+		auto title = SimpleTextArea::create("s e l e c t   p a r t", "bigFont.fnt", 0.9f)->getLines()[0];
+		title->setAnchorPoint({ 0.5f, 0.5f });
+		menu->addChildAtPosition(title, Anchor::Top, { 0, -28 });
+
+		addChild(menu);
+
+		auto pages = CCArrayExt<CCLayer>();
+		auto createLevelPage = [](std::string name, std::string file)
+			{
+				auto menu = CCMenu::create();
+
+				auto title = SimpleTextArea::create(
+					name, "bigFont.fnt", 0.6f
+				)->getLines()[0];
+				title->setAnchorPoint({ 0.5f, 0.5f });
+				menu->addChildAtPosition(title, Anchor::Bottom, { 0.f, 42.f });
+
+				auto image = CCSprite::create(file.c_str());
+				limitNodeHeight(image, 246.f, 999.f, 0.1f);
+				menu->addChildAtPosition(image, Anchor::Center, { 0.f, 33.f });
+
+				return menu;
 			};
-			audio->playEffect(*select_randomly(dashes.begin(), dashes.end()), 1.f, 1.f, 1.f);
-		}
-		GJBaseGameLayer::gameEventTriggered(p0, p1, p2);
-	};
-};
+		pages.push_back(createLevelPage("part 1: you know when u should stop", "Screenshot_76.png"));
+		pages.push_back(createLevelPage("part 2: test", "Screenshot_166.png"));
+		pages.push_back(createLevelPage("part 3: test", "Screenshot_181.png"));
+		pages.push_back(createLevelPage("part 4: test", "Screenshot_195.png"));
 
-#include <Geode/modify/PlayerObject.hpp>
-class $modify(PlayerObjectExt, PlayerObject) {
-	struct Fields {
-		float m_lastPlatformerXVelocity = 0.1;
-	};
-	bool isCube() {
-		auto player = this;
-		if (!player->m_isShip && !player->m_isBall && !player->m_isBird && !player->m_isDart && !player->m_isRobot && !player->m_isSpider && !player->m_isSwing)
-			return true;
-		return false;
-	}
-	bool isStanding() {
-		return fabs(this->m_platformerXVelocity) < 0.25f and this->m_isPlatformer;
-	}
-	bool isOnAir() {
-		return !this->m_isOnGround or !in_range(m_yVelocity, -0.2f, 0.2f);
-	}
-	bool isTurnedLeft() {
-		return m_fields->m_lastPlatformerXVelocity < 0.f and this->m_isPlatformer;
-	}
-	bool showAnimPlr() {
-		return (this->m_isRobot or isCube()) and !this->m_isDead;
-	}
-	void mySch(float) {
-		if (not this) return;
-		m_fields->m_lastPlatformerXVelocity =
-			fabs(this->m_platformerXVelocity) > 0.001f ?
-			this->m_platformerXVelocity : m_fields->m_lastPlatformerXVelocity;
-		auto mainLayer = this->getChildByIDRecursive("main-layer");
-		auto spr_player_idle = typeinfo_cast<CCSprite*>(this->getChildByIDRecursive("spr_player_idle"_spr));
-		auto spr_player_run = typeinfo_cast<CCSprite*>(this->getChildByIDRecursive("spr_player_run"_spr));
-		auto spr_player_fall = typeinfo_cast<CCSprite*>(this->getChildByIDRecursive("spr_player_fall"_spr));
-		auto spr_player_jump = typeinfo_cast<CCSprite*>(this->getChildByIDRecursive("spr_player_jump"_spr));
-		if (spr_player_idle and spr_player_run and mainLayer) {
-			mainLayer->setVisible(!showAnimPlr());
-			;; spr_player_run->setVisible(showAnimPlr() and !isOnAir() and !isStanding());
-			; spr_player_idle->setVisible(showAnimPlr() and !isOnAir() and isStanding());
-			; spr_player_fall->setVisible(showAnimPlr() and isOnAir() and m_yVelocity <= -0.0f);
-			; spr_player_jump->setVisible(showAnimPlr() and isOnAir() and m_yVelocity >= 0.0f);
-			auto visible_sprite = cocos::findFirstChildRecursive<CCSprite>(this,
-				[](CCSprite* node) {
-					if (!string::contains(node->getID(), GEODE_MOD_ID)) return false;
-					return cocos::nodeIsVisible(node);
-				}
-			);
-			if (visible_sprite) {
-				auto name = getFrameName(visible_sprite);
+		auto scroll = BoomScrollLayer::create(pages.inner(), 0, 0);
+		scroll->setScale(0.825f);
+		scroll->setAnchorPoint(CCPointMake(0.5f, 0.15f));
 
-				visible_sprite->setFlipX(isTurnedLeft());
-				visible_sprite->setFlipY(this->m_isUpsideDown);
-
-				if (m_iconSprite) m_iconSprite->setDisplayFrame(visible_sprite->displayFrame());
-				if (m_iconSpriteSecondary) m_iconSpriteSecondary->setDisplayFrame(visible_sprite->displayFrame());
-				if (m_iconSpriteWhitener) m_iconSpriteWhitener->setDisplayFrame(visible_sprite->displayFrame());
-				if (m_iconGlow)m_iconGlow->setDisplayFrame(visible_sprite->displayFrame());
-
-				//step sound
-				auto waitForStepB = FMODAudioEngine::sharedEngine()->getChildByID("waitForStepB"_spr);
-				if (string::contains(name, "spr_player_run")) {
-					if (!waitForStepB) {
-						waitForStepB = createDataNode("waitForStepB"_spr);
-						FMODAudioEngine::sharedEngine()->addChild(waitForStepB);
-					}
-					if (string::contains(name, "spr_player_run1") and !waitForStepB->isVisible()) {
-						FMODAudioEngine::sharedEngine()->playEffect("step_a.ogg", 1.f, 1.f, 1.f);
-						waitForStepB->setVisible(true);
-					}
-					if (string::contains(name, "spr_player_run6") and waitForStepB->isVisible()) {
-						FMODAudioEngine::sharedEngine()->playEffect("step_b.ogg", 1.f, 1.f, 1.f);
-						waitForStepB->setVisible(false);
-					}
-				}
-				else if (waitForStepB) waitForStepB->setVisible(false);
-			};
-
-			this->m_robotBurstParticles->setVisible(0);
-		}
-
-		if (m_holdingLeft or m_holdingRight) {
-			m_isPlatformer = 1;
-			if (m_gameLayer) m_gameLayer->m_isPlatformer = 1;
-		}
-	}
-	void updateRotation(float p0) {
-		if (this->isCube()) {
-			auto isPlatformer = m_isPlatformer;
-			this->m_isPlatformer = 0;
-			this->m_isRobot = 1;
-			PlayerObject::updateRotation(isOnAir() ? (p0 * 0.05f) : (p0 * 2.0f));
-			this->m_isRobot = 0;
-			this->m_isPlatformer = isPlatformer;
-		}
-		else PlayerObject::updateRotation(p0);
-	}
-	void updateJump(float p0) {
-		if (this->isCube()) {
-			this->m_isRobot = 1;
-			PlayerObject::updateJump(p0);
-			this->m_isRobot = 0;
-		}
-		else PlayerObject::updateJump(p0);
-	}
-	bool init(int p0, int p1, GJBaseGameLayer * p2, cocos2d::CCLayer * p3, bool p4) {
-		if (!PlayerObject::init(p0, p1, p2, p3, p4)) return false;
-
-		//add animations
-#define add(name, amount, speed) \
-		auto name = CCSprite::create(#name"1.png"_spr); \
-		if (name) { \
-			name->setID(#name""_spr); \
-			name->setVisible(0); \
-			this->addChild(name); \
-			auto frames = CCArray::create(); \
-			for (int i = 1; i <= amount; i++) if (auto sprite = CCSprite::create( \
-				fmt::format("{}/"#name"{}.png", GEODE_MOD_ID, i).data() \
-			)) frames->addObject(sprite->displayFrame()); \
-			else log::warn("there is no {}/"#name"{}.png", GEODE_MOD_ID, i); \
-			log::debug("{}", frames); \
-			name->runAction(CCRepeatForever::create(CCAnimate::create(CCAnimation::createWithSpriteFrames(frames, speed)))); \
-		};
-		add(spr_player_idle, 5, 0.25f);
-		add(spr_player_run, 9, 0.07f);
-		add(spr_player_fall, 3, 0.035f);
-		add(spr_player_jump, 3, 0.035f);
-#undef add
-
-		this->schedule(schedule_selector(PlayerObjectExt::mySch));
-
-		auto drag = "4a-1a0.9a0.35a20a90a45a75a20a5a1a0a-300a0a0a0a0a1a2a0a0a1a0.1a1a0.1a1a0.1a0.352941a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a1a1a0a1a1a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0";
-		GameToolbox::particleFromString(drag, this->m_playerGroundParticles, 0);
-
-		auto land = "8a0.02a0.84a0.35a-1a90a45a75a20a8a1a0a-300a0a0a0a0a1a2a0a0a1a0.1a1a0.1a1a0.1a0.352941a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a1a1a0a1a1a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0";
-		GameToolbox::particleFromString(land, this->m_landParticles0, 0);
-		GameToolbox::particleFromString(land, this->m_landParticles1, 0);
+		addChild(scroll);
 
 		return true;
 	}
@@ -180,47 +81,6 @@ class $modify(CCMenuItemSpriteExtraExt, CCMenuItemSpriteExtra) {
 		}
 		return CCMenuItemSpriteExtra::selected();
 	}
-};
-
-#include <Geode/modify/GManager.hpp>
-class $modify(ResourcesLoader, GManager) {
-	$override void setup() {
-
-		//for ui.blah.json to ui/blah.json as example
-		for (auto& p : fs::glob::glob(getMod()->getResourcesDir().string() + "/*.*.*")) {
-			auto name = p.filename().string();
-			std::reverse(name.begin(), name.end());
-			auto should_replace = false;
-			for (auto& ch : name) {
-				ch = (ch == '.' and should_replace) ? '/' : ch;
-				should_replace = (ch == '.') ? true : should_replace;
-			}
-			std::reverse(name.begin(), name.end());
-			auto todvde = std::filesystem::path(name);
-			auto newp = p.parent_path() / todvde.parent_path();
-			std::filesystem::create_directories(newp, fs::last_err_code);
-			std::filesystem::rename(p, newp / todvde.filename(), fs::last_err_code);
-		}
-
-		CCFileUtils::sharedFileUtils()->addPriorityPath(
-			getMod()->getResourcesDir().string().c_str()
-		);
-
-		GManager::setup();
-	}
-};
-
-#include <Geode/modify/CCSpriteFrameCache.hpp>
-class $modify(CCSpriteFrameCacheExt, CCSpriteFrameCache) {
-	CCSpriteFrame* spriteFrameByName(const char* pszName) {
-		//log::debug("{}({})", __FUNCTION__, pszName);
-		auto frameAtSprExtName = (Mod::get()->getID() + "/" + pszName);
-		auto frameAtSprExt = CCSpriteFrameCache::get()->m_pSpriteFrames->objectForKey(frameAtSprExtName);
-		auto rtn = CCSpriteFrameCache::spriteFrameByName(
-			frameAtSprExt ? frameAtSprExtName.data() : pszName
-		);
-		return rtn;
-	};
 };
 
 #include <Geode/modify/GameManager.hpp>
@@ -377,7 +237,42 @@ item->setCascadeColorEnabled(1);													\
 item->setAnchorPoint({0.f, 0.5f});													\
 menu->addChild(item); __VA_ARGS__													\
 }
-		menu_item_to_link_label("play", "play-button");
+
+		{ 
+			auto item = CCMenuItemExt::createSpriteExtra(
+				SimpleTextArea::create("play", "bigFont.fnt", 0.6f)->getLines()[0],
+				[this](CCMenuItemSpriteExtra* item) {
+					auto label = typeinfo_cast<CCLabelBMFont*>(item->getNormalImage());
+					if (auto a = item->getChildByID("submenu")) {
+						!label ? void() : label->setOpacity(255);
+						return a->removeFromParent();
+					}
+					!label ? void() : label->setOpacity(173);
+					auto submenu = CCMenu::create();
+					submenu->setID("submenu");
+					submenu->addChild(CCMenuItemExt::createSpriteExtra(
+						SimpleTextArea::create("story", "bigFont.fnt", 0.6f)->getLines()[0],
+						[this](CCNode* item) {
+							switchToScene(PartSelector::create());
+						}
+					));
+					submenu->addChild(CCMenuItemExt::createSpriteExtra(
+						SimpleTextArea::create("runaways", "bigFont.fnt", 0.6f)->getLines()[0],
+						[this](CCNode* item) {
+
+						}
+					));
+					submenu->setLayout(RowLayout::create()->setAxisAlignment(AxisAlignment::Start));
+					submenu->setAnchorPoint({ 0.0f, 0.5f });
+					submenu->runAction(CCEaseExponentialOut::create(CCMoveBy::create(0.5f, ccp(4, 0))));
+					item->addChildAtPosition(submenu, Anchor::Right, {8 - 4, 0}, false);
+				}
+			);
+			item->setCascadeColorEnabled(1);
+			item->setAnchorPoint({ 0.f, 0.5f });
+			menu->addChild(item);
+		};
+
 		menu_item_to_link_label("settings", "settings-button");
 		menu_item_to_link_label("geode", "geode.loader/geode-button");
 
@@ -388,8 +283,8 @@ menu->addChild(item); __VA_ARGS__													\
 				SimpleTextArea::create("more", "bigFont.fnt", 0.6f)->getLines()[0],
 				[this](CCNode*) {
 					if (auto a = this->getChildByID("submenu"_spr)) {
-						if (a->getChildByID("more-submenu"_spr)) return a->removeFromParentAndCleanup(0);
-						a->removeFromParentAndCleanup(0);
+						if (a->getChildByID("more-submenu"_spr)) return a->removeFromParent();
+						a->removeFromParent();
 					}
 					auto menu = CCMenu::create();
 					menu->setID("menu"_spr);
@@ -407,16 +302,17 @@ menu->addChild(item); __VA_ARGS__													\
 						->setCrossAxisLineAlignment(AxisAlignment::End)
 					);
 
-					auto submenu_scroll = ScrollLayer::create({ 860.f, 235.f });
+					auto submenu_scroll = ScrollLayer::create(this->getContentSize());
 					submenu_scroll->m_cutContent = 0;
-					submenu_scroll->m_contentLayer->addChild(menu);
+					submenu_scroll->m_contentLayer->addChildAtPosition(menu, Anchor::Right, { (menu->getContentWidth()/-2) - 6.f, 0.f }, 0);
 					submenu_scroll->m_contentLayer->setContentHeight(menu->getContentHeight());
 					submenu_scroll->scrollToTop();
 					submenu_scroll->setID("submenu"_spr);
 					submenu_scroll->setZOrder(-1);
 					submenu_scroll->addChild(createDataNode("more-submenu"_spr));
-					submenu_scroll->runAction(CCEaseExponentialOut::create(CCMoveBy::create(0.5f, ccp(6, 0))));
-					this->addChildAtPosition(submenu_scroll, Anchor::BottomLeft, { -108.f - 6, 0.f }, 0);
+					submenu_scroll->runAction(CCEaseExponentialOut::create(CCMoveBy::create(0.5f, ccp(-116, 0))));
+					submenu_scroll->setScale(0.95f);
+					this->addChildAtPosition(submenu_scroll, Anchor::BottomLeft, { 116.f, 0.f }, 0);
 				}
 			); 
 			item->setCascadeColorEnabled(1); 
