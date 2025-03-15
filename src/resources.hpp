@@ -37,6 +37,7 @@ class $modify(CCSpriteFrameCacheExt, CCSpriteFrameCache) {
 		auto rtn = CCSpriteFrameCache::spriteFrameByName(
 			frameAtSprExt ? frameAtSprExtName.data() : pszName
 		);
+		if (string::contains(pszName, "chain_01_001.png")) return CCSprite::create()->displayFrame();
 		return rtn;
 	};
 };

@@ -20,12 +20,12 @@
 		{
 			"id": "geode.node-ids",
 			"version": ">=v1.13.1",
-			"importance": "required"
+			"importance": "recommended"
 		},
 		{
 			"id": "alphalaneous.happy_textures",
 			"version": ">=v1.9.2",
-			"importance": "required"
+			"importance": "recommended"
 		}
 	],
 	"resources": {

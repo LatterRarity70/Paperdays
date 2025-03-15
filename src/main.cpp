@@ -7,70 +7,162 @@
 #include <player.hpp>
 #include <resources.hpp>
 
-class PartSelector : public CCLayer {
-	public:
-	CREATE_FUNC(PartSelector);
+class PartSelector : public CCLayer, CCMouseDelegate, CCKeyboardDelegate {
+public:
+
+	Ref<BoomScrollLayer> m_scroll;
+	bool m_scrolling;
+
+	virtual void keyDown(enumKeyCodes key) override {
+
+		std::set isLeftKey = {
+			key == enumKeyCodes::CONTROLLER_Left,
+			key == enumKeyCodes::KEY_ArrowLeft,
+			key == enumKeyCodes::KEY_Left,
+		};
+		if (isLeftKey.contains(true)) m_scroll->moveToPage(m_scroll->m_page - 1);
+
+		std::set isRightKey = {
+			key == enumKeyCodes::CONTROLLER_Right,
+			key == enumKeyCodes::KEY_ArrowRight,
+			key == enumKeyCodes::KEY_Right,
+		};
+		if (isRightKey.contains(true)) m_scroll->moveToPage(m_scroll->m_page + 1);
+
+		std::set isScrollKeys{ false };
+		for (auto a : isLeftKey) isScrollKeys.insert(a);
+		for (auto a : isRightKey) isScrollKeys.insert(a);
+		if (isScrollKeys.contains(true) and m_scrolling) FMODAudioEngine::get(
+		)->playEffect("menuItemSelectSound.ogg");
+
+		CCLayer::keyDown(key);
+
+	}
+
+	virtual void scrollWheel(float x, float y) override {
+
+		if ((int)fabs(y) == 3) m_scroll->moveToPage(m_scroll->m_page + (y > 0.f ? 1 : -1));
+		if ((int)fabs(x) == 3) m_scroll->moveToPage(m_scroll->m_page + (x > 0.f ? 1 : -1));
+		if ((int)fabs(x) == 3) if (m_scrolling) FMODAudioEngine::get()->playEffect("menuItemSelectSound.ogg");
+
+	}
+
 	virtual void keyBackClicked(void) override {
+		CCLayer::keyBackClicked();
+
 		auto asd = CreatorLayer::create();
 		asd->onBack(nullptr);
 		asd->release();
 	}
+
+	virtual void update(float delta) override {
+		CCLayer::update(delta);
+		m_scrolling = m_scroll->m_extendedLayer->numberOfRunningActions();
+		if (auto bg = typeinfo_cast<CCSprite*>(getChildByIDRecursive("selector_bg"_spr))) {
+			auto fmod = FMODAudioEngine::sharedEngine();
+			if (not fmod->m_metering) fmod->enableMetering();
+			bg->setOpacity((255 - 160) + (fmod->m_pulse2 * 120));
+		}
+	}
+
+	CREATE_FUNC(PartSelector);
+
 	virtual bool init() override {
 		if (!CCLayer::init()) return false;
+
+		auto bg = CCSprite::create("selector_bg.png");
+		bg->setID("selector_bg"_spr);
+		limitNodeHeight(bg, this->getContentHeight(), 999.f, 0.1f);
+		bg->setAnchorPoint({ 1.f, 0.5f });
+		this->addChildAtPosition(bg, Anchor::Right, {}, 0);
+
+		//listing
+		{
+			auto pages = CCArrayExt<CCLayer>();
+			auto page = [](int id, std::string name, std::string file)
+				{
+
+					auto level = GameLevelManager::get()->getMainLevel(id, false);
+					level->m_levelID = id;
+					level->m_levelName = name.c_str();
+
+					auto menu = CCMenu::create();
+					menu->setTag(id);
+
+					auto title = SimpleTextArea::create(
+						name, "bigFont.fnt", 0.6f
+					)->getLines()[0];
+					title->setAnchorPoint({ 0.5f, 0.5f });
+					menu->addChildAtPosition(title, Anchor::Bottom, { 0.f, 42.f });
+
+					auto image = CCSprite::create(file.c_str());
+					limitNodeHeight(image, 246.f, 999.f, 0.1f);
+					menu->addChildAtPosition(CCMenuItemExt::createSpriteExtra(image, [level, id](CCNode* a)
+						{
+							CCDirector::get()->replaceScene(PlayLayer::scene(level, false, false));
+						}
+					), Anchor::Center, {0.f, 33.f});
+
+					return menu;
+
+				};
+			pages.push_back(page(116102387, "part 1: you know when u should stop", "Screenshot_76.png"));
+			pages.push_back(page(5001, "part 2: test", "Screenshot_166.png"));
+			pages.push_back(page(5002, "part 3: test", "Screenshot_181.png"));
+			pages.push_back(page(5003, "part 4: test", "Screenshot_195.png"));
+			pages.push_back(page(5004, "part 5: test", "p5.png"));
+
+			m_scroll = BoomScrollLayer::create(pages.inner(), 0, 0);
+			m_scroll->setScale(0.825f);
+			m_scroll->setAnchorPoint(CCPointMake(0.5f, 0.15f));
+
+			addChild(m_scroll);
+		};
+
+		if (auto menu = CCMenu::create()) {
+
+			auto title = SimpleTextArea::create("s e l e c t   p a r t", "bigFont.fnt", 0.9f)->getLines()[0];
+			title->setAnchorPoint({ 0.5f, 0.5f });
+			menu->addChildAtPosition(title, Anchor::Top, { 0, -28 });
+
+			auto back = CCMenuItemExt::createSpriteExtraWithFrameName(
+				"GJ_arrow_01_001.png", 1.0f, [this](CCNode* ADs) { this->keyBackClicked(); }
+			);
+			menu->addChildAtPosition(back, Anchor::TopLeft, { 36, -36 });
+
+			auto left = CCMenuItemExt::createSpriteExtraWithFrameName(
+				"navArrowBtn_001.png", 0.8f, [this](CCNode* ADs) { this->keyDown(KEY_Left); }
+			);
+			left->getNormalImage()->setRotation(-180);
+			menu->addChildAtPosition(left, Anchor::Left, { 32, 0 });
+
+			auto right = CCMenuItemExt::createSpriteExtraWithFrameName(
+				"navArrowBtn_001.png", 0.8f, [this](CCNode* ADs) { this->keyDown(KEY_Right); }
+			);
+			menu->addChildAtPosition(right, Anchor::Right, { -32, 0 });
+
+			addChild(menu);
+		}
+
+		addChild(SahderLayer::create("basic.vsh", "menu.fsh"));
 
 		this->setTouchEnabled(1);
 		this->setKeyboardEnabled(1);
 		this->setKeypadEnabled(1);
+		this->setMouseEnabled(1);
 
-		auto menu = CCMenu::create();
-
-		auto back = CCMenuItemExt::createSpriteExtraWithFrameName(
-			"GJ_arrow_01_001.png", 1.0f, [this](CCNode* ADs) { this->keyBackClicked(); }
-		);
-		menu->addChildAtPosition(back, Anchor::TopLeft, { 36, -36 });
-
-		auto title = SimpleTextArea::create("s e l e c t   p a r t", "bigFont.fnt", 0.9f)->getLines()[0];
-		title->setAnchorPoint({ 0.5f, 0.5f });
-		menu->addChildAtPosition(title, Anchor::Top, { 0, -28 });
-
-		addChild(menu);
-
-		auto pages = CCArrayExt<CCLayer>();
-		auto createLevelPage = [](std::string name, std::string file)
-			{
-				auto menu = CCMenu::create();
-
-				auto title = SimpleTextArea::create(
-					name, "bigFont.fnt", 0.6f
-				)->getLines()[0];
-				title->setAnchorPoint({ 0.5f, 0.5f });
-				menu->addChildAtPosition(title, Anchor::Bottom, { 0.f, 42.f });
-
-				auto image = CCSprite::create(file.c_str());
-				limitNodeHeight(image, 246.f, 999.f, 0.1f);
-				menu->addChildAtPosition(image, Anchor::Center, { 0.f, 33.f });
-
-				return menu;
-			};
-		pages.push_back(createLevelPage("part 1: you know when u should stop", "Screenshot_76.png"));
-		pages.push_back(createLevelPage("part 2: test", "Screenshot_166.png"));
-		pages.push_back(createLevelPage("part 3: test", "Screenshot_181.png"));
-		pages.push_back(createLevelPage("part 4: test", "Screenshot_195.png"));
-
-		auto scroll = BoomScrollLayer::create(pages.inner(), 0, 0);
-		scroll->setScale(0.825f);
-		scroll->setAnchorPoint(CCPointMake(0.5f, 0.15f));
-
-		addChild(scroll);
+		this->scheduleUpdate();
 
 		return true;
 	}
+
 };
 
 #include <Geode/modify/CCMenuItemSpriteExtra.hpp>
 class $modify(CCMenuItemSpriteExtraExt, CCMenuItemSpriteExtra) {
 	$override void selected() {
-		if (m_selectSound.empty()) this->m_selectSound = "btnClick.ogg";
+		if (m_selectSound.empty()) this->m_selectSound = "menuItemSelectSound.ogg";
+		if (m_activateSound.empty()) this->m_activateSound = "menuItemActivateSound.ogg";
 		if (auto spr = typeinfo_cast<CCNodeRGBA*>(this->getNormalImage())) {
 			spr->setCascadeColorEnabled(1);
 			spr->setCascadeOpacityEnabled(1);
@@ -91,6 +183,12 @@ class $modify(GameManagerExt, GameManager) {
 	$override ccColor3B colorForIdx(int p0) {
 		return ccWHITE;
 	}
+	$override gd::string getMenuMusicFile() {
+		static bool other_menu_music = rndb(9);
+		if (other_menu_music) return ("the_last_thing_she_sent_me.mp3");
+		return GameManager::getMenuMusicFile();
+	}
+	$override
 };
 
 #include <Geode/modify/LoadingLayer.hpp>
@@ -193,10 +291,39 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 #include <Geode/modify/MenuLayer.hpp>
 class $modify(MenuLayerExt, MenuLayer) {
 	void upd(float) {
-		if (not this) return; 
+		if (not this) return;
+
+		if(auto bg = typeinfo_cast<CCSprite*>(getChildByIDRecursive("bg0"_spr))) {
+			auto fmod = FMODAudioEngine::sharedEngine();
+			if (not fmod->m_metering) fmod->enableMetering();
+			bg->setOpacity((255 - 160) + (fmod->m_pulse1 * 120));
+		}
+
 	}
+	virtual void keyDown(cocos2d::enumKeyCodes key) {
+
+		std::set isPlayKey = {
+			key == enumKeyCodes::KEY_Space,
+			key == enumKeyCodes::KEY_ArrowUp,
+			key == enumKeyCodes::KEY_Up,
+			key == enumKeyCodes::KEY_Play,//xd
+			key == enumKeyCodes::CONTROLLER_Start,
+		};
+		if (isPlayKey.contains(true)) return (void)switchToScene(PartSelector::create());
+
+		if (key == enumKeyCodes::KEY_Tab) return this->openOptions(0);
+
+		//secrets maybe?
+		/*static std::stringstream latest_keys_in_menu;
+		latest_keys_in_menu << CCKeyboardDispatcher::get()->keyToString(((int)key > 1 ? key : KEY_ApplicationsKey));
+		log::debug("latest_keys_in_menu:{}", latest_keys_in_menu.str());*/
+
+		MenuLayer::keyDown(key);
+		this->setKeyboardEnabled(1);
+	};
 	bool init() {
 		if (!MenuLayer::init()) return false;
+		this->setKeyboardEnabled(1);
 
 		if (1) findFirstChildRecursive<CCNode>(
 			this, [this](CCNode* node) {
@@ -206,6 +333,52 @@ class $modify(MenuLayerExt, MenuLayer) {
 				return false;
 			}
 		);
+
+		//dependencies test :D
+		if ([] {
+			for (auto dep : getMod()->getMetadata().getDependencies()) {
+				if (not Loader::get()->isModLoaded(dep.id)) return true;
+			}
+			return false;
+			}())
+		
+		{
+
+			auto menu = CCMenu::create();
+			menu->setID("dependencies_alert"_spr);
+			addChild(menu, 999, 54645);
+
+			auto stream = std::stringstream();
+			for (auto dep : getMod()->getMetadata().getDependencies()) {
+				stream << "- " << (Loader::get()->isModLoaded(dep.id) ? "\\[<cg>WAS LOADED</c>\\]" : "\\[<cr>NOT LOADED</c>\\]");
+				stream << fmt::format(": [{}](mod:{})", dep.id, dep.id) << std::endl;
+			}
+			log::debug("{}", stream.str());
+			auto list = MDTextArea::create(stream.str(), this->getContentSize() * 0.65);
+			list->getScrollLayer()->m_cutContent = 0;
+			menu->addChildAtPosition(list, Anchor::Center, { 0, 0 });
+
+			auto title = SimpleTextArea::create("REQURIED MODS WASN'T LOADED...", "bigFont.fnt", 0.9f)->getLines()[0];
+			title->setAnchorPoint({ 0.5f, 0.5f });
+			menu->addChildAtPosition(title, Anchor::Top, { 0, -28 });
+
+			auto restart = CCMenuItemExt::createSpriteExtra(
+				ButtonSprite::create(
+					"i sure these mods will be loaded. restart game", "bigFont.fnt", "GJ_button_04.png", 0.7f
+				),
+				[this](CCNode* ADs) { game::restart(); }
+			);
+			restart->getNormalImage()->setScale(0.7f);
+			menu->addChildAtPosition(restart, Anchor::Bottom, { 0, 36 });
+
+			menu->addChild(SahderLayer::create("basic.vsh", "menu.fsh"));
+
+			GameManager::get()->fadeInMusic("the_last_thing_she_sent_me.mp3");
+
+			return true;
+		};
+
+		if (utils::rndb(4)) GameManager::get()->fadeInMusic("the_last_thing_she_sent_me.mp3");
 
 		//gjFont30.fnt
 		
@@ -274,11 +447,8 @@ menu->addChild(item); __VA_ARGS__													\
 		};
 
 		menu_item_to_link_label("settings", "settings-button");
-		menu_item_to_link_label("geode", "geode.loader/geode-button");
 
-		menu->addChild(SimpleTextArea::create("   ", "bigFont.fnt", 1.0f));
-
-		{ 
+		{
 			auto item = CCMenuItemExt::createSpriteExtra(
 				SimpleTextArea::create("more", "bigFont.fnt", 0.6f)->getLines()[0],
 				[this](CCNode*) {
@@ -304,7 +474,7 @@ menu->addChild(item); __VA_ARGS__													\
 
 					auto submenu_scroll = ScrollLayer::create(this->getContentSize());
 					submenu_scroll->m_cutContent = 0;
-					submenu_scroll->m_contentLayer->addChildAtPosition(menu, Anchor::Right, { (menu->getContentWidth()/-2) - 6.f, 0.f }, 0);
+					submenu_scroll->m_contentLayer->addChildAtPosition(menu, Anchor::Right, { (menu->getContentWidth() / -2) - 6.f, 0.f }, 0);
 					submenu_scroll->m_contentLayer->setContentHeight(menu->getContentHeight());
 					submenu_scroll->scrollToTop();
 					submenu_scroll->setID("submenu"_spr);
@@ -314,11 +484,14 @@ menu->addChild(item); __VA_ARGS__													\
 					submenu_scroll->setScale(0.95f);
 					this->addChildAtPosition(submenu_scroll, Anchor::BottomLeft, { 116.f, 0.f }, 0);
 				}
-			); 
-			item->setCascadeColorEnabled(1); 
-			item->setAnchorPoint({ 0.f, 0.5f }); 
-			menu->addChild(item); 
+			);
+			item->setCascadeColorEnabled(1);
+			item->setAnchorPoint({ 0.f, 0.5f });
+			menu->addChild(item);
 		};
+
+		menu->addChild(SimpleTextArea::create("   ", "bigFont.fnt", 1.0f));
+		menu->addChild(SimpleTextArea::create("   ", "bigFont.fnt", 1.0f));
 
 		menu_item_to_link_label("quit", "close-button");
 
@@ -364,6 +537,7 @@ menu->addChild(item); __VA_ARGS__													\
 
 		auto bg0 = CCSprite::create("bg0.png"_spr);
 		bg0->setID("bg0"_spr);
+		bg0->setColor(ccc3(30, 30, 30));
 		bg0->setPosition(CCPointMake(418.f, 92.f));
 		bg->addChild(bg0);
 
