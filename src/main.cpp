@@ -175,20 +175,38 @@ class $modify(CCMenuItemSpriteExtraExt, CCMenuItemSpriteExtra) {
 	}
 };
 
+#include <Geode/modify/CCNode.hpp>
+class $modify(ColorsController, CCNode) {
+	$override void visit() {
+		if (this == nullptr) return;
+		auto rgba_node = typeinfo_cast<CCNodeRGBA*>(this);
+		auto rgba_layr = typeinfo_cast<CCLayerRGBA*>(this);
+#define repl(org, tar) if (node->getColor() == org) node->setColor(tar);
+		if (auto node = rgba_node) {
+			repl(ccc3(0, 102, 255), ccc3(255, 255, 255));
+			repl(ccc3(0, 75, 100), ccc3(255, 255, 255));
+			repl(ccc3(0, 56, 141), ccc3(22, 22, 22));
+			repl(ccc3(0, 39, 98), ccc3(17, 17, 17));
+			repl(ccc3(0, 46, 117), ccc3(14, 14, 14));
+			repl(ccc3(0, 36, 91), ccc3(10, 10, 10));
+			repl(ccc3(0, 31, 79), ccc3(10, 10, 10));
+		};
+		if (auto node = rgba_layr) {
+			repl(ccc3(191, 114, 62), ccc3(6, 6, 6));
+			repl(ccc3(161, 88, 44), ccc3(10, 10, 10));
+			repl(ccc3(194, 114, 62), ccc3(8, 8, 8));
+		};
+		CCNode::visit();
+	}
+};
+
 #include <Geode/modify/GameManager.hpp>
 class $modify(GameManagerExt, GameManager) {
-	$override int countForType(IconType p0) {
-		return 1;
-	}
-	$override ccColor3B colorForIdx(int p0) {
-		return ccWHITE;
-	}
 	$override gd::string getMenuMusicFile() {
 		static bool other_menu_music = rndb(9);
 		if (other_menu_music) return ("the_last_thing_she_sent_me.mp3");
 		return GameManager::getMenuMusicFile();
 	}
-	$override
 };
 
 #include <Geode/modify/LoadingLayer.hpp>
