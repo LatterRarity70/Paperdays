@@ -86,6 +86,10 @@ public:
 					level->m_levelID = id;
 					level->m_levelName = name.c_str();
 
+					if (id == 116102387) level->m_levelString = (
+						"H4sIAAAAAAAACrVUSW7jMBD8UFvojYuQU96QBxA-5wt5_PRCjROMMhAR58Ki3NXVK_3-Jh1oKA4exGXI4FIGUQIn5I86bjTqIEQcbdCg4kcfOPqgDxohgXxNgn4usZ9KOCcdLonwqchSO-z75xr6jGLKcP_vGntZpn4rs5jPU4pqzxA5H9GaCJ3vyqLI-dtZFDmbDry_kkAnxwIBNUHBzry3OLkAuiG_qPvXm-zxI0OxU-IehlcNVloJk8SpkzTWhJRTTKCEyUwpThVJm6RNKrAzU0xTTLMEzbRFEjIVyfQl4_n_l8OexcwqasJMlzJ5gxcCYzLoXkCgwu4BqFg0t1REs1mvzUZYoLRptUwt97LtHs2zF_drftOKcca9txCi3UbBcFMX4l6mRjiJe23VmZ6d-GEM9vgU0WuEj-j82dOHg_8MB2M49HvDwf8MB58yHHoMJzqg7dEBiQ4IRMqexp3uN7obfGXrErstsecqXKbLGr2u0fcLdFRfcmkyiz12uIPGJuunLS6Gufzl785K-7Kzigo3sldDPk8lH6fG4NS2Dbdi2GPzGauE1zFCb8Z8YXZWi8xHKrghRTZ5wXhsR1rximwJL1fhjUinRxne2ukkB5F877aqL38Aa8rQofsIAAA="
+						);
+
 					auto menu = CCMenu::create();
 					menu->setTag(id);
 

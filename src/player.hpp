@@ -8,16 +8,16 @@ class $modify(GJBaseGameLayerSoundEvents, GJBaseGameLayer) {
 		auto eventID = static_cast<int>(p0);
 		auto audio = FMODAudioEngine::get();
 		if (eventID >= 1 and eventID <= 5) {//landing
-			audio->playEffect("step_landing.ogg", 1.f, 1.f / eventID, 0.9f + (eventID / 10));
+			if (m_player1->m_isRobot) audio->playEffect("step_landing.ogg", 1.f, 1.f / eventID, 0.9f + (eventID / 10));
 		}
 		if (eventID >= 12 and eventID <= 13) {//jump
-			audio->playEffect("step_jump.ogg", 1.f, 1.f, 1.f);
+			if (m_player1->m_isRobot) audio->playEffect("step_jump.ogg", 1.f, 1.f, 1.f);
 		}
 		if (eventID == 23) {//dash
 			auto dashes = {
 				"dash1.ogg","dash2.ogg","dash3.ogg","dash4.ogg","dash5.ogg"
 			};
-			audio->playEffect(*select_randomly(dashes.begin(), dashes.end()), 1.f, 1.f, 1.f);
+			if (m_player1->m_isRobot) audio->playEffect(*select_randomly(dashes.begin(), dashes.end()), 1.f, 1.f, 1.f);
 		}
 		GJBaseGameLayer::gameEventTriggered(p0, p1, p2);
 	};
@@ -44,7 +44,7 @@ class $modify(PlayerObjectExt, PlayerObject) {
 		return m_fields->m_lastPlatformerXVelocity < 0.f and this->m_isPlatformer;
 	}
 	bool showAnimPlr() {
-		return (this->m_isRobot or isCube()) and !this->m_isDead;
+		return (this->m_isRobot) and !this->m_isDead;
 	}
 	void mySch(float) {
 		if (not this) return;
@@ -68,28 +68,32 @@ class $modify(PlayerObjectExt, PlayerObject) {
 			; spr_player_jump->setVisible(showAnimPlr() and isOnAir() and m_yVelocity >= 0.0f);
 			auto visible_sprite = cocos::findFirstChildRecursive<CCSprite>(this,
 				[](CCSprite* node) {
-					if (!string::contains(node->getID(), GEODE_MOD_ID)) return false;
+					if (!string::contains(node->getID(), GEODE_MOD_ID"/spr_player")) return false;
+					node->pauseSchedulerAndActions();
 					return cocos::nodeIsVisible(node);
 				}
 			);
 			if (visible_sprite) {
 				auto name = getFrameName(visible_sprite);
 
-				visible_sprite->setFlipX(isTurnedLeft());
-				visible_sprite->setFlipY(this->m_isUpsideDown);
+				visible_sprite->resumeSchedulerAndActions();
+				visible_sprite->setRotation(mainLayer->getRotation());
+				visible_sprite->setScaleX(mainLayer->getScaleX());
+				visible_sprite->setScaleY(mainLayer->getScaleY());
 
 				if (m_iconSprite) m_iconSprite->setDisplayFrame(visible_sprite->displayFrame());
 				if (m_iconSpriteSecondary) m_iconSpriteSecondary->setDisplayFrame(visible_sprite->displayFrame());
 				if (m_iconSpriteWhitener) m_iconSpriteWhitener->setDisplayFrame(visible_sprite->displayFrame());
-				if (m_iconGlow)m_iconGlow->setDisplayFrame(visible_sprite->displayFrame());
+				if (m_iconGlow) m_iconGlow->setDisplayFrame(visible_sprite->displayFrame());
 
 				//step sound
-				auto waitForStepB = FMODAudioEngine::sharedEngine()->getChildByID("waitForStepB"_spr);
+				auto waitForStepB = this->getChildByID("waitForStepB"_spr);
 				if (string::contains(name, "spr_player_run")) {
 					if (!waitForStepB) {
 						waitForStepB = createDataNode("waitForStepB"_spr);
-						FMODAudioEngine::sharedEngine()->addChild(waitForStepB);
+						this->addChild(waitForStepB);
 					}
+
 					if (string::contains(name, "spr_player_run1") and !waitForStepB->isVisible()) {
 						FMODAudioEngine::sharedEngine()->playEffect("step_a.ogg", 1.f, 1.f, 1.f);
 						waitForStepB->setVisible(true);
@@ -98,6 +102,11 @@ class $modify(PlayerObjectExt, PlayerObject) {
 						FMODAudioEngine::sharedEngine()->playEffect("step_b.ogg", 1.f, 1.f, 1.f);
 						waitForStepB->setVisible(false);
 					}
+
+					if (fabs(m_fields->m_lastPlatformerXVelocity) == 0.45f) FMODAudioEngine::sharedEngine
+					()->playEffect("step_a.ogg", 1.f, 1.f, 1.f
+					);
+
 				}
 				else if (waitForStepB) waitForStepB->setVisible(false);
 			};
@@ -112,25 +121,6 @@ class $modify(PlayerObjectExt, PlayerObject) {
 
 		m_yVelocity = m_isUpsideDown ? -m_yVelocity : m_yVelocity;
 	}
-	void updateRotation(float p0) {
-		if (this->isCube()) {
-			auto isPlatformer = m_isPlatformer;
-			this->m_isPlatformer = 0;
-			this->m_isRobot = 1;
-			PlayerObject::updateRotation(isOnAir() ? (p0 * 0.05f) : (p0 * 2.0f));
-			this->m_isRobot = 0;
-			this->m_isPlatformer = isPlatformer;
-		}
-		else PlayerObject::updateRotation(p0);
-	}
-	void updateJump(float p0) {
-		if (this->isCube()) {
-			this->m_isRobot = 1;
-			PlayerObject::updateJump(p0);
-			this->m_isRobot = 0;
-		}
-		else PlayerObject::updateJump(p0);
-	}
 	bool init(int p0, int p1, GJBaseGameLayer * p2, cocos2d::CCLayer * p3, bool p4) {
 		if (!PlayerObject::init(p0, p1, p2, p3, p4)) return false;
 
@@ -140,6 +130,7 @@ class $modify(PlayerObjectExt, PlayerObject) {
 		if (name) { \
 			name->setID(#name""_spr); \
 			name->setVisible(0); \
+			name->setScale(0.f); \
 			this->addChild(name); \
 			auto frames = CCArray::create(); \
 			for (int i = 1; i <= amount; i++) if (auto sprite = CCSprite::create( \
