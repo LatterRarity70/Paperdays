@@ -1,6 +1,7 @@
 #include <_main.hpp>
 #include <fs.hpp>
 
+#include <Geode/utils/web.hpp>
 #include <SahderLayer.hpp>
 #include <ViewportLayer.hpp>
 
@@ -207,7 +208,7 @@ class $modify(ColorsController, CCNode) {
 #include <Geode/modify/GameManager.hpp>
 class $modify(GameManagerExt, GameManager) {
 	$override gd::string getMenuMusicFile() {
-		static bool other_menu_music = rndb(9);
+		static bool other_menu_music = rndb(4);
 		if (other_menu_music) return ("the_last_thing_she_sent_me.mp3");
 		return GameManager::getMenuMusicFile();
 	}
@@ -239,7 +240,7 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 		
 		static bool volume_preloaded = 0;
 		if (volume_preloaded) void();
-		else FMODAudioEngine::get()->setBackgroundMusicVolume(GameManager::get()->m_bgVolume);//xd
+		else if (GameManager::get()->m_bgVolume) FMODAudioEngine::get()->setBackgroundMusicVolume(GameManager::get()->m_bgVolume);//xd
 		volume_preloaded = 1;
 
 		GameManager::get()->fadeInMusic("WaitingTheme.mp3");
@@ -300,7 +301,7 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 			verLabel->limitLabelWidth(92.f, 0.5f, 0.1f);
 			verLabel->setPositionY(this->getContentHeight()); 
 			verLabel->setScale(0.337f);
-			verLabel->setAnchorPoint(CCPointMake(-0.12f, 2.1f));
+			verLabel->setAnchorPoint(CCPointMake(-0.025f, 1.5f));
 			verLabel->setOpacity(77);
 			this->addChild(verLabel);
 		};
@@ -363,8 +364,9 @@ class $modify(MenuLayerExt, MenuLayer) {
 			}
 			return false;
 			}())
-		
 		{
+
+			GameManager::get()->fadeInMusic("the_last_thing_she_sent_me.mp3");
 
 			auto menu = CCMenu::create();
 			menu->setID("dependencies_alert"_spr);
@@ -395,12 +397,8 @@ class $modify(MenuLayerExt, MenuLayer) {
 
 			menu->addChild(SahderLayer::create("basic.vsh", "menu.fsh"));
 
-			GameManager::get()->fadeInMusic("the_last_thing_she_sent_me.mp3");
-
 			return true;
 		};
-
-		if (utils::rndb(4)) GameManager::get()->fadeInMusic("the_last_thing_she_sent_me.mp3");
 
 		//gjFont30.fnt
 		
@@ -576,6 +574,87 @@ menu->addChild(item); __VA_ARGS__													\
 		bg->addChild(bg2);
 
 		this->addChild(SahderLayer::create("basic.vsh", "menu.fsh"), 1, 1337);
+
+		auto get_release_data_listener = new EventListener<web::WebTask>;
+
+		//get mod json
+		get_release_data_listener->bind(
+			[this, get_release_data_listener](web::WebTask::Event* e) {
+				if (web::WebResponse* res = e->getValue()) {
+					delete get_release_data_listener;
+
+					auto str = res->string().unwrapOr("xd");
+
+					auto parsed = matjson::parse(str).unwrapOrDefault();
+
+					auto installed_size = fs::file_size(getMod()->getPackagePath(), fs::last_err_code);
+					auto actual_size = parsed["release"]["assets"][0]["size"].asInt().unwrapOrDefault();
+
+					if (installed_size == actual_size) return;
+
+					auto pop = geode::createQuickPopup(
+						"Update!",
+						fmt::format(
+							"Dev release size mismatch with installed one :D"
+							"\n" "Download latest dev release of mod?"
+						),
+						"Later.", "Yes", [this, parsed](CCNode* pop, bool Yes) {
+							if (!Yes) return;
+
+							this->setVisible(0);
+
+							GameManager::get()->fadeInMusic("the_last_thing_she_sent_me.mp3");
+
+							auto req = web::WebRequest();
+
+							auto state_win = Notification::create("Downloading... (///%)");
+							state_win->setTime(1337.f);
+							state_win->show();
+
+							state_win->m_pParent->addChild(
+								SahderLayer::create("basic.vsh", "menu.fsh"),
+								state_win->getZOrder() + 1
+							);
+							
+							auto listener = new EventListener<web::WebTask>;
+							listener->bind(
+								[state_win](web::WebTask::Event* e) {
+									if (web::WebProgress* prog = e->getProgress()) {
+										state_win->setString(fmt::format("Downloading... ({}%)", (int)prog->downloadProgress().value_or(000)));
+									}
+									if (web::WebResponse* res = e->getValue()) {
+										std::string data = res->string().unwrapOr("no res");
+										if (res->code() < 399) {
+											res->into(getMod()->getPackagePath());
+											game::restart();
+										}
+										else {
+											auto asd = geode::createQuickPopup(
+												"Request exception",
+												data,
+												"Nah", nullptr, 420.f, nullptr, false
+											);
+											asd->show();
+										};
+									}
+								}
+							);
+
+							listener->setFilter(req.send(
+								"GET", 
+								parsed["release"]["assets"][0]["downloadUrl"].asString().unwrapOrDefault()
+							));
+
+						}, false
+					);
+					pop->m_scene = this;
+					pop->show();
+				}
+			}
+		);
+		get_release_data_listener->setFilter(
+			web::WebRequest().get("https://ungh.cc/repos/user95401/Umbral-Abyss/releases/latest")
+		);
 
 		this->schedule(schedule_selector(MenuLayerExt::upd));
 		return true;
