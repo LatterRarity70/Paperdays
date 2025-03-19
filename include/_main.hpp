@@ -6,7 +6,6 @@ using namespace geode::prelude;
 #include <regex>
 
 #include <fs.hpp>
-#include <imgui.hpp>
 
 //lol
 #define SETTING(type, key_name) Mod::get()->getSettingValue<type>(key_name)

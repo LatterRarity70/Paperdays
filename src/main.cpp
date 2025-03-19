@@ -240,7 +240,7 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 		
 		static bool volume_preloaded = 0;
 		if (volume_preloaded) void();
-		else if (GameManager::get()->m_bgVolume) FMODAudioEngine::get()->setBackgroundMusicVolume(GameManager::get()->m_bgVolume);//xd
+		else FMODAudioEngine::get()->setBackgroundMusicVolume(GameManager::get()->m_bgVolume);//xd
 		volume_preloaded = 1;
 
 		GameManager::get()->fadeInMusic("WaitingTheme.mp3");
@@ -611,7 +611,7 @@ menu->addChild(item); __VA_ARGS__													\
 							state_win->setTime(1337.f);
 							state_win->show();
 
-							state_win->m_pParent->addChild(
+							if (state_win->m_pParent) state_win->m_pParent->addChild(
 								SahderLayer::create("basic.vsh", "menu.fsh"),
 								state_win->getZOrder() + 1
 							);
