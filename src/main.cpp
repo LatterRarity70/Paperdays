@@ -334,7 +334,11 @@ class $modify(MenuLayerExt, MenuLayer) {
 		};
 		if (isPlayKey.contains(true)) return (void)switchToScene(PartSelector::create());
 
-		if (key == enumKeyCodes::KEY_Tab) return this->openOptions(0);
+		if (key == enumKeyCodes::KEY_Tab) {
+			auto button_node = (this ? this : CCNode::create())->getChildByIDRecursive("settings-button");
+			if (button_node) if (auto cast = typeinfo_cast<CCMenuItem*>(button_node)) cast->activate();
+			return;
+		}
 
 		//secrets maybe?
 		/*static std::stringstream latest_keys_in_menu;
@@ -580,15 +584,13 @@ menu->addChild(item); __VA_ARGS__													\
 		//get mod json
 		get_release_data_listener->bind(
 			[this, get_release_data_listener](web::WebTask::Event* e) {
-				if (web::WebResponse* res = e->getValue()) {
-					delete get_release_data_listener;
+				if (web::WebProgress* prog = e->getProgress()) {
+					//log::debug("{}", prog->downloadTotal());
 
-					auto str = res->string().unwrapOr("xd");
-
-					auto parsed = matjson::parse(str).unwrapOrDefault();
+					if (prog->downloadTotal() > 0) void(); else return;
 
 					auto installed_size = fs::file_size(getMod()->getPackagePath(), fs::last_err_code);
-					auto actual_size = parsed["release"]["assets"][0]["size"].asInt().unwrapOrDefault();
+					auto actual_size = prog->downloadTotal();
 
 					if (installed_size == actual_size) return;
 
@@ -598,7 +600,7 @@ menu->addChild(item); __VA_ARGS__													\
 							"Dev release size mismatch with installed one :D"
 							"\n" "Download latest dev release of mod?"
 						),
-						"Later.", "Yes", [this, parsed](CCNode* pop, bool Yes) {
+						"Later.", "Yes", [this](CCNode* pop, bool Yes) {
 							if (!Yes) return;
 
 							this->setVisible(0);
@@ -642,18 +644,22 @@ menu->addChild(item); __VA_ARGS__													\
 
 							listener->setFilter(req.send(
 								"GET", 
-								parsed["release"]["assets"][0]["downloadUrl"].asString().unwrapOrDefault()
+								"https://github.com/user95401/Umbral-Abyss/releases/download/nightly/user95401.umbral-abyss.geode"
 							));
 
 						}, false
 					);
 					pop->m_scene = this;
 					pop->show();
+
+					e->cancel();
+					get_release_data_listener->disable();
+					delete get_release_data_listener;
 				}
 			}
 		);
 		get_release_data_listener->setFilter(
-			web::WebRequest().get("https://ungh.cc/repos/user95401/Umbral-Abyss/releases/latest")
+			web::WebRequest().get("https://github.com/user95401/Umbral-Abyss/releases/download/nightly/user95401.umbral-abyss.geode")
 		);
 
 		this->schedule(schedule_selector(MenuLayerExt::upd));
