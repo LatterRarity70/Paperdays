@@ -290,10 +290,11 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 		{
 			auto verLabel = CCLabelBMFont::create(
 				fmt::format(
-					"SDK {} at {} Platform, Release {}",
-					Mod::get()->getVersion().toVString(),
+					"SDK {} at {} Platform, Release {} (Dev, {})",
+					Mod::get()->getMetadata().getGeodeVersion().toVString(),
 					GEODE_PLATFORM_NAME,
-					Mod::get()->getMetadata().getGeodeVersion().toVString()
+					Mod::get()->getVersion().toVString(),
+					fs::file_size(getMod()->getPackagePath(), fs::last_err_code)
 				).c_str(),
 				"gjFont30.fnt",
 				kCCTextAlignmentLeft
@@ -368,7 +369,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 			}
 			return false;
 			}())
-		{
+		if (1) {
 
 			GameManager::get()->fadeInMusic("the_last_thing_she_sent_me.mp3");
 
@@ -613,10 +614,22 @@ menu->addChild(item); __VA_ARGS__													\
 							state_win->setTime(1337.f);
 							state_win->show();
 
-							if (state_win->m_pParent) state_win->m_pParent->addChild(
-								SahderLayer::create("basic.vsh", "menu.fsh"),
-								state_win->getZOrder() + 1
-							);
+							if (state_win->m_pParent) {
+
+								auto loading_bg = CCSprite::create("GJ_gradientBG.png");
+								if (loading_bg) {
+									loading_bg->setID("loading_bg");
+									loading_bg->setAnchorPoint(CCPointMake(0.f, 0.f));
+									loading_bg->setScaleX(getContentWidth() / loading_bg->getContentWidth());
+									loading_bg->setScaleY(getContentHeight() / loading_bg->getContentHeight());
+									state_win->m_pParent->addChild(loading_bg);
+								}
+
+								state_win->m_pParent->addChild(
+									SahderLayer::create("basic.vsh", "menu.fsh"),
+									state_win->getZOrder() + 1
+								);
+							}
 							
 							auto listener = new EventListener<web::WebTask>;
 							listener->bind(
