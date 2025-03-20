@@ -7,7 +7,7 @@ class $modify(GJBaseGameLayerSoundEvents, GJBaseGameLayer) {
 	void gameEventTriggered(GJGameEvent p0, int p1, int p2) {
 		auto eventID = static_cast<int>(p0);
 		auto audio = FMODAudioEngine::get();
-		if (eventID >= 1 and eventID <= 5) {//landing
+		if (eventID >= 2 and eventID <= 5) {//landing
 			if (m_player1->m_isRobot) audio->playEffect("step_landing.ogg", 1.f, 1.f / eventID, 0.9f + (eventID / 10));
 		}
 		if (eventID >= 12 and eventID <= 13) {//jump
