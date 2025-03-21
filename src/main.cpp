@@ -208,7 +208,7 @@ class $modify(ColorsController, CCNode) {
 #include <Geode/modify/GameManager.hpp>
 class $modify(GameManagerExt, GameManager) {
 	$override gd::string getMenuMusicFile() {
-		static bool other_menu_music = rndb(4);
+		static bool other_menu_music = rndb(3);
 		if (other_menu_music) return ("the_last_thing_she_sent_me.mp3");
 		return GameManager::getMenuMusicFile();
 	}
