@@ -619,7 +619,7 @@ menu->addChild(item); __VA_ARGS__													\
 
 		this->addChild(SahderLayer::create("basic.vsh", "menu.fsh"), 1, 1337);
 
-		if (fileExistsInSearchPaths((getMod()->getTempDir() / GEODE_MOD_ID".so").string().c_str())) {
+		if (fileExistsInSearchPaths((getMod()->getTempDir() / GEODE_MOD_ID".android64.so").string().c_str())) {
 			auto get_release_data_listener = new EventListener<web::WebTask>;
 
 			get_release_data_listener->bind(
