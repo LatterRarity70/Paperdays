@@ -21,6 +21,10 @@
 			"id": "geode.node-ids",
 			"version": ">=v1.13.1",
 			"importance": "recommended"
+		},
+		{
+			"id": "hjfod.gmd-api",
+			"version": "1.4.1"
 		}
 	],
 	"resources": {
@@ -28,7 +32,7 @@
 			"assets/files/**/*.*"
 		],
 		"sprites": [
-			"assets/sprites/**/*.*"
+			"assets/sprites/**/*.png"
 		],
 		"spritesheets": {
 			"spritesheet": [

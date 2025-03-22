@@ -8,6 +8,7 @@
 #include <player.hpp>
 #include <resources.hpp>
 
+#include <hjfod.gmd-api/include/GMD.hpp>
 class PartSelector : public CCLayer, CCMouseDelegate, CCKeyboardDelegate {
 public:
 
@@ -80,19 +81,24 @@ public:
 		//listing
 		{
 			auto pages = CCArrayExt<CCLayer>();
-			auto page = [](int id, std::string name, std::string file)
+			auto page = [](std::string name, std::string level_file, std::string image_file)
 				{
 
-					auto level = GameLevelManager::get()->getMainLevel(id, false);
-					level->m_levelID = id;
-					level->m_levelName = name.c_str();
+					Ref<GJGameLevel> level;
 
-					if (id == 116102387) level->m_levelString = (
-						"H4sIAAAAAAAACrVUSW7jMBD8UFvojYuQU96QBxA-5wt5_PRCjROMMhAR58Ki3NXVK_3-Jh1oKA4exGXI4FIGUQIn5I86bjTqIEQcbdCg4kcfOPqgDxohgXxNgn4usZ9KOCcdLonwqchSO-z75xr6jGLKcP_vGntZpn4rs5jPU4pqzxA5H9GaCJ3vyqLI-dtZFDmbDry_kkAnxwIBNUHBzry3OLkAuiG_qPvXm-zxI0OxU-IehlcNVloJk8SpkzTWhJRTTKCEyUwpThVJm6RNKrAzU0xTTLMEzbRFEjIVyfQl4_n_l8OexcwqasJMlzJ5gxcCYzLoXkCgwu4BqFg0t1REs1mvzUZYoLRptUwt97LtHs2zF_drftOKcca9txCi3UbBcFMX4l6mRjiJe23VmZ6d-GEM9vgU0WuEj-j82dOHg_8MB2M49HvDwf8MB58yHHoMJzqg7dEBiQ4IRMqexp3uN7obfGXrErstsecqXKbLGr2u0fcLdFRfcmkyiz12uIPGJuunLS6Gufzl785K-7Kzigo3sldDPk8lH6fG4NS2Dbdi2GPzGauE1zFCb8Z8YXZWi8xHKrghRTZ5wXhsR1rximwJL1fhjUinRxne2ukkB5F877aqL38Aa8rQofsIAAA="
-						);
+					if (cocos::fileExistsInSearchPaths(level_file.c_str())) {
+						level = gmd::importGmdAsLevel((std::string)CCFileUtils::get()->fullPathForFilename(
+							level_file.c_str(), false
+						)).unwrapOrDefault();
+						level->m_levelName = name.c_str();
+						level->m_levelType = GJLevelType::Local;
+					}
+					else {
+						level = GJGameLevel::create();
+					}
 
 					auto menu = CCMenu::create();
-					menu->setTag(id);
+					menu->setID(name);
 
 					auto title = SimpleTextArea::create(
 						name, "bigFont.fnt", 0.6f
@@ -100,22 +106,23 @@ public:
 					title->setAnchorPoint({ 0.5f, 0.5f });
 					menu->addChildAtPosition(title, Anchor::Bottom, { 0.f, 42.f });
 
-					auto image = CCSprite::create(file.c_str());
-					limitNodeHeight(image, 246.f, 999.f, 0.1f);
-					menu->addChildAtPosition(CCMenuItemExt::createSpriteExtra(image, [level, id](CCNode* a)
+					auto preview = CCSprite::create(image_file.c_str());
+					limitNodeHeight(preview, 246.f, 999.f, 0.1f);
+					menu->addChildAtPosition(CCMenuItemExt::createSpriteExtra(preview, [level](CCNode* a)
 						{
 							CCDirector::get()->replaceScene(PlayLayer::scene(level, false, false));
+							//switchToScene(LevelInfoLayer::create(level, 0));
 						}
 					), Anchor::Center, {0.f, 33.f});
 
 					return menu;
 
 				};
-			pages.push_back(page(116102387, "part 1: you know when u should stop", "Screenshot_76.png"));
-			pages.push_back(page(5001, "part 2: test", "Screenshot_166.png"));
-			pages.push_back(page(5002, "part 3: test", "Screenshot_181.png"));
-			pages.push_back(page(5003, "part 4: test", "Screenshot_195.png"));
-			pages.push_back(page(5004, "part 5: test", "p5.png"));
+			pages.push_back(page("part 1: you know when u should stop", "ua1.gmd", "Screenshot_76.png"));
+			pages.push_back(page("part 2: test", "nah", "Screenshot_166.png"));
+			pages.push_back(page("part 3: test", "nah", "Screenshot_181.png"));
+			pages.push_back(page("part 4: test", "nah", "Screenshot_195.png"));
+			pages.push_back(page("part 5: test", "nah", "p5.png"));
 
 			m_scroll = BoomScrollLayer::create(pages.inner(), 0, 0);
 			m_scroll->setScale(0.825f);
@@ -184,6 +191,26 @@ class $modify(CCMenuItemSpriteExtraExt, CCMenuItemSpriteExtra) {
 class $modify(ColorsController, CCNode) {
 	$override void visit() {
 		if (this == nullptr) return;
+		//add shader
+		if (typeinfo_cast<CCLayer*>(this)) if (!getChildByType<SahderLayer>(-1)) {
+			bool add = 0;
+			add = typeinfo_cast<PauseLayer*>(this) ? 1 : add;
+			add = typeinfo_cast<GJDropDownLayer*>(this) ? 1 : add;
+			add = typeinfo_cast<MoreOptionsLayer*>(this) ? 1 : add;
+			add = typeinfo_cast<FLAlertLayer*>(this) ? 1 : add;
+			add = this->getChildByID("background") ? 1 : add;
+			add = findFirstChildRecursive<CCScrollLayerExt>(this, [](auto) {return true; }) ? 0 : add;
+			if (add) this->addChild(
+				SahderLayer::create("basic.vsh", "menu.fsh"), 1337, 1337
+			);
+		}
+		else {
+			auto sahder = getChildByType<SahderLayer>(-1);
+			bool remove = 0;
+			remove = findFirstChildRecursive<CCScrollLayerExt>(this, [](auto) {return true; }) ? 1 : remove;
+			remove = typeinfo_cast<MenuLayer*>(this) ? 0 : remove;
+			if (remove) sahder->removeFromParent();
+		}
 		auto rgba_node = typeinfo_cast<CCNodeRGBA*>(this);
 		auto rgba_layr = typeinfo_cast<CCLayerRGBA*>(this);
 #define repl(org, tar) if (node->getColor() == org) node->setColor(tar);
@@ -195,11 +222,23 @@ class $modify(ColorsController, CCNode) {
 			repl(ccc3(0, 46, 117), ccc3(14, 14, 14));
 			repl(ccc3(0, 36, 91), ccc3(10, 10, 10));
 			repl(ccc3(0, 31, 79), ccc3(10, 10, 10));
+			repl(ccc3(244, 212, 142), ccc3(92, 92, 92));
+			repl(ccc3(245, 174, 125), ccc3(255, 255, 255));
+			repl(ccc3(236, 137, 124), ccc3(92, 92, 92));
+			repl(ccc3(213, 105, 133), ccc3(255, 255, 255));
+			repl(ccc3(173, 84, 146), ccc3(92, 92, 92));
+			repl(ccc3(113, 74, 154), ccc3(255, 255, 255));
 		};
 		if (auto node = rgba_layr) {
+			if (node->getColor() == ccc3(51, 68, 153)) { node->setOpacity(160); node->setColor(ccBLACK); }// UI OPTIONS
 			repl(ccc3(191, 114, 62), ccc3(6, 6, 6));
 			repl(ccc3(161, 88, 44), ccc3(10, 10, 10));
 			repl(ccc3(194, 114, 62), ccc3(8, 8, 8));
+			//mod-list-frame
+			if (node->getColor() == ccc3(25, 17, 37)) node->setOpacity(0);// frame-bg
+			repl(ccc3(83, 65, 109), ccc3(17, 17, 17));//search-id
+			if (node->getColor() == ccc3(168, 85, 44)) node->setOpacity(0);// frame-bg gd
+			repl(ccc3(114, 63, 31), ccc3(17, 17, 17));//search-id gd
 		};
 		CCNode::visit();
 	}
@@ -580,100 +619,102 @@ menu->addChild(item); __VA_ARGS__													\
 
 		this->addChild(SahderLayer::create("basic.vsh", "menu.fsh"), 1, 1337);
 
-		auto get_release_data_listener = new EventListener<web::WebTask>;
+		if (fileExistsInSearchPaths((getMod()->getTempDir() / GEODE_MOD_ID".so").string().c_str())) {
+			auto get_release_data_listener = new EventListener<web::WebTask>;
 
-		//get mod json
-		get_release_data_listener->bind(
-			[this, get_release_data_listener](web::WebTask::Event* e) {
-				if (web::WebProgress* prog = e->getProgress()) {
-					//log::debug("{}", prog->downloadTotal());
+			get_release_data_listener->bind(
+				[this, get_release_data_listener](web::WebTask::Event* e) {
+					if (web::WebProgress* prog = e->getProgress()) {
+						//log::debug("{}", prog->downloadTotal());
 
-					if (prog->downloadTotal() > 0) void(); else return;
+						if (prog->downloadTotal() > 0) void(); else return;
 
-					auto installed_size = fs::file_size(getMod()->getPackagePath(), fs::last_err_code);
-					auto actual_size = prog->downloadTotal();
+						auto installed_size = fs::file_size(getMod()->getPackagePath(), fs::last_err_code);
+						auto actual_size = prog->downloadTotal();
 
-					if (installed_size == actual_size) return;
+						if (installed_size == actual_size) return;
 
-					auto pop = geode::createQuickPopup(
-						"Update!",
-						fmt::format(
-							"Dev release size mismatch with installed one :D"
-							"\n" "Download latest dev release of mod?"
-						),
-						"Later.", "Yes", [this](CCNode* pop, bool Yes) {
-							if (!Yes) return;
+						auto pop = geode::createQuickPopup(
+							"Update!",
+							fmt::format(
+								"Dev release size mismatch with installed one :D"
+								"\n" "Download latest dev release of mod?"
+							),
+							"Later.", "Yes", [this](CCNode* pop, bool Yes) {
+								if (!Yes) return;
 
-							this->setVisible(0);
+								this->setVisible(0);
 
-							GameManager::get()->fadeInMusic("the_last_thing_she_sent_me.mp3");
+								GameManager::get()->fadeInMusic("the_last_thing_she_sent_me.mp3");
 
-							auto req = web::WebRequest();
+								auto req = web::WebRequest();
 
-							auto state_win = Notification::create("Downloading... (///%)");
-							state_win->setTime(1337.f);
-							state_win->show();
+								auto state_win = Notification::create("Downloading... (///%)");
+								state_win->setTime(1337.f);
+								state_win->show();
 
-							if (state_win->m_pParent) {
+								if (state_win->m_pParent) {
 
-								auto loading_bg = CCSprite::create("GJ_gradientBG.png");
-								if (loading_bg) {
-									loading_bg->setID("loading_bg");
-									loading_bg->setAnchorPoint(CCPointMake(0.f, 0.f));
-									loading_bg->setScaleX(getContentWidth() / loading_bg->getContentWidth());
-									loading_bg->setScaleY(getContentHeight() / loading_bg->getContentHeight());
-									state_win->m_pParent->addChild(loading_bg);
+									auto loading_bg = CCSprite::create("GJ_gradientBG.png");
+									if (loading_bg) {
+										loading_bg->setID("loading_bg");
+										loading_bg->setAnchorPoint(CCPointMake(0.f, 0.f));
+										loading_bg->setScaleX(getContentWidth() / loading_bg->getContentWidth());
+										loading_bg->setScaleY(getContentHeight() / loading_bg->getContentHeight());
+										state_win->m_pParent->addChild(loading_bg);
+									}
+
+									state_win->m_pParent->addChild(
+										SahderLayer::create("basic.vsh", "menu.fsh"),
+										state_win->getZOrder() + 1
+									);
 								}
 
-								state_win->m_pParent->addChild(
-									SahderLayer::create("basic.vsh", "menu.fsh"),
-									state_win->getZOrder() + 1
-								);
-							}
-							
-							auto listener = new EventListener<web::WebTask>;
-							listener->bind(
-								[state_win](web::WebTask::Event* e) {
-									if (web::WebProgress* prog = e->getProgress()) {
-										state_win->setString(fmt::format("Downloading... ({}%)", (int)prog->downloadProgress().value_or(000)));
-									}
-									if (web::WebResponse* res = e->getValue()) {
-										std::string data = res->string().unwrapOr("no res");
-										if (res->code() < 399) {
-											res->into(getMod()->getPackagePath());
-											game::restart();
+								auto listener = new EventListener<web::WebTask>;
+								listener->bind(
+									[state_win](web::WebTask::Event* e) {
+										if (web::WebProgress* prog = e->getProgress()) {
+											state_win->setString(fmt::format("Downloading... ({}%)", (int)prog->downloadProgress().value_or(000)));
 										}
-										else {
-											auto asd = geode::createQuickPopup(
-												"Request exception",
-												data,
-												"Nah", nullptr, 420.f, nullptr, false
-											);
-											asd->show();
-										};
+										if (web::WebResponse* res = e->getValue()) {
+											std::string data = res->string().unwrapOr("no res");
+											if (res->code() < 399) {
+												res->into(getMod()->getPackagePath());
+												game::restart();
+											}
+											else {
+												auto asd = geode::createQuickPopup(
+													"Request exception",
+													data,
+													"Nah", nullptr, 420.f, nullptr, false
+												);
+												asd->show();
+											};
+										}
 									}
-								}
-							);
+								);
 
-							listener->setFilter(req.send(
-								"GET", 
-								"https://github.com/user95401/Umbral-Abyss/releases/download/nightly/user95401.umbral-abyss.geode"
-							));
+								listener->setFilter(req.send(
+									"GET",
+									"https://github.com/user95401/Umbral-Abyss/releases/download/nightly/user95401.umbral-abyss.geode"
+								));
 
-						}, false
-					);
-					pop->m_scene = this;
-					pop->show();
+							}, false
+						);
+						pop->m_scene = this;
+						pop->show();
 
-					e->cancel();
-					get_release_data_listener->disable();
-					delete get_release_data_listener;
+						e->cancel();
+						get_release_data_listener->disable();
+						delete get_release_data_listener;
+					}
 				}
-			}
-		);
-		get_release_data_listener->setFilter(
-			web::WebRequest().get("https://github.com/user95401/Umbral-Abyss/releases/download/nightly/user95401.umbral-abyss.geode")
-		);
+			);
+			get_release_data_listener->setFilter(
+				web::WebRequest().get("https://github.com/user95401/Umbral-Abyss/releases/download/nightly/user95401.umbral-abyss.geode")
+			);
+		}
+		else Notification::create("update check was aborted because its a dev build...")->show();
 
 		this->schedule(schedule_selector(MenuLayerExt::upd));
 		return true;

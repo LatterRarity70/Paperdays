@@ -5,14 +5,9 @@ class $modify(ResourcesLoader, GManager) {
 	$override void setup() {
 
 		//for ui.blah.json to ui/blah.json as example
-		for (auto& p : fs::glob::glob(getMod()->getResourcesDir().string() + "/*.*.*")) {
+		for (auto& p : fs::glob::glob(getMod()->getResourcesDir().string() + "/*[.!SUB_DIR]*.*")) {
 			auto name = p.filename().string();
-			std::reverse(name.begin(), name.end());
-			auto should_replace = false;
-			for (auto& ch : name) {
-				ch = (ch == '.' and should_replace) ? '/' : ch;
-				should_replace = (ch == '.') ? true : should_replace;
-			}
+			
 			std::reverse(name.begin(), name.end());
 			auto todvde = std::filesystem::path(name);
 			auto newp = p.parent_path() / todvde.parent_path();
