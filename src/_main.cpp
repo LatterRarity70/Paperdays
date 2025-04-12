@@ -5,7 +5,7 @@
 #include <SahderLayer.hpp>
 #include <ViewportLayer.hpp>
 
-#include <player.hpp>
+#include <game.hpp>
 #include <resources.hpp>
 
 #include <hjfod.gmd-api/include/GMD.hpp>
@@ -118,10 +118,10 @@ public:
 					return menu;
 
 				};
-			pages.push_back(page("part 1: you know when u should stop", "ua1.gmd", "Screenshot_76.png"));
-			pages.push_back(page("part 2: test", "nah", "Screenshot_166.png"));
-			pages.push_back(page("part 3: test", "nah", "Screenshot_181.png"));
-			pages.push_back(page("part 4: test", "nah", "Screenshot_195.png"));
+			pages.push_back(page("part 1: you know when u should stop", "ua1.gmd", "p1.png"));
+			pages.push_back(page("part 2: test", "nah", "p2.png"));
+			pages.push_back(page("part 3: test", "nah", "p3.png"));
+			pages.push_back(page("part 4: test", "nah", "p4.png"));
 			pages.push_back(page("part 5: test", "nah", "p5.png"));
 
 			m_scroll = BoomScrollLayer::create(pages.inner(), 0, 0);

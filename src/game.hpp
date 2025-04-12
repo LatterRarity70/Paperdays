@@ -1,9 +1,12 @@
 #pragma once
 
-#define in_range(a, m, t) (a >= m and a <= t)
+#define in_range(tar, from, to) (tar >= from and tar <= to)
 
 #include <Geode/modify/GJBaseGameLayer.hpp>
 class $modify(GJBaseGameLayerSoundEvents, GJBaseGameLayer) {
+	void generateTargetGroups() {
+		GJBaseGameLayer::generateTargetGroups();
+	};
 	void gameEventTriggered(GJGameEvent p0, int p1, int p2) {
 		auto eventID = static_cast<int>(p0);
 		auto audio = FMODAudioEngine::get();
@@ -11,7 +14,24 @@ class $modify(GJBaseGameLayerSoundEvents, GJBaseGameLayer) {
 			if (m_player1->m_isRobot) audio->playEffect("step_landing.ogg", 1.f, 1.f / eventID, 0.9f + (eventID / 10));
 		}
 		if (eventID >= 12 and eventID <= 13) {//jump
-			if (m_player1->m_isRobot) audio->playEffect("step_jump.ogg", 1.f, 1.f, 1.f);
+			if (m_player1->m_isRobot) {
+
+				if (!m_player1->getActionByTag(5718932)) {
+					auto jump_anim = CCSequence::create(
+						CCEaseBackOut::create(CCScaleTo::create(
+							0.1f, m_player1->getScaleX() - 0.15f, m_player1->getScaleY() + 0.15f
+						)),
+						CCEaseSineOut::create(CCScaleTo::create(
+							0.15f, m_player1->getScale(), m_player1->getScaleX()
+						)),
+						nullptr
+					);
+					jump_anim->setTag(5718932);
+					m_player1->runAction(jump_anim);
+				};
+
+				audio->playEffect("step_jump.ogg", 1.f, 1.f, 1.f);
+			}
 		}
 		if (eventID == 23) {//dash
 			auto dashes = {
@@ -20,6 +40,12 @@ class $modify(GJBaseGameLayerSoundEvents, GJBaseGameLayer) {
 			if (m_player1->m_isRobot) audio->playEffect(*select_randomly(dashes.begin(), dashes.end()), 1.f, 1.f, 1.f);
 		}
 		GJBaseGameLayer::gameEventTriggered(p0, p1, p2);
+	};
+	void updateCamera(float p0) {
+		auto isPlatformer = this->m_isPlatformer;
+		this->m_isPlatformer = 1;
+		GJBaseGameLayer::updateCamera(p0);
+		this->m_isPlatformer = isPlatformer;
 	};
 };
 

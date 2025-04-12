@@ -59,12 +59,9 @@ public:
 		);
 
 		m_shaderProgram = new CCGLProgram();
-		log::debug(
-			"{}.shaderInitResult({}) = {}", __func__, fShaderFilename,
-			m_shaderProgram->initWithVertexShaderByteArray(
-				vertexSource.unwrap().c_str(), 
-				fragmentSource.unwrap().c_str()
-			)
+		m_shaderProgram->initWithVertexShaderByteArray(
+			vertexSource.unwrapOrDefault().c_str(),
+			fragmentSource.unwrapOrDefault().c_str()
 		);
 		m_shaderProgram->addAttribute(kCCAttributeNamePosition, kCCVertexAttrib_Position);
 		m_shaderProgram->addAttribute(kCCAttributeNameColor, kCCVertexAttrib_Color);
@@ -72,6 +69,7 @@ public:
 		m_shaderProgram->link();
 		m_shaderProgram->updateUniforms();
 
+		this->update(0.f);
 		this->scheduleUpdate();
 
 		return true;

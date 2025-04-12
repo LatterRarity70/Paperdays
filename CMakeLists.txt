@@ -14,6 +14,3 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/sr
 
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
 setup_geode_mod(${PROJECT_NAME})
-
-CPMAddPackage("gh:matcool/gd-imgui-cocos#fbd4103")
-target_link_libraries(${PROJECT_NAME} imgui-cocos)
