@@ -380,7 +380,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 
 	}
 	void splashShowUp(float) {
-		log::debug("{}->{}", this, __FUNCTION__);
+		//log::debug("{}->{}", this, __FUNCTION__);
 		//sch runned on splash_text
 		auto splash_text = typeinfo_cast<SimpleTextArea*>(this);
 		if (splash_text) void(); else return;
@@ -389,7 +389,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 
 		auto apos = std::vector<float>{ 0.0f };
 		for (auto i = 5; i > 0; i--) apos.push_back((float)i / 10);
-		log::debug("apos {}", apos);
+		//log::debug("apos {}", apos);
 		this->setAnchorPoint({
 			*utils::select_randomly(apos.begin(), apos.end()),
 			*utils::select_randomly(apos.begin(), apos.end())
@@ -399,7 +399,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 			CCDelayTime::create(1.0f),
 			CallFuncExt::create(
 				[this, splash_text] {
-					log::debug("{}->runAction({})", this, __FUNCTION__);
+					//log::debug("{}->runAction({})", this, __FUNCTION__);
 					if (auto menu = getChildByType<CCMenu>(0)) menu->setVisible(false);
 
 					std::vector<std::string> splash_texts = {
@@ -483,7 +483,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 		//secrets maybe?
 		/*static std::stringstream latest_keys_in_menu;
 		latest_keys_in_menu << CCKeyboardDispatcher::get()->keyToString(((int)key > 1 ? key : KEY_ApplicationsKey));
-		log::debug("latest_keys_in_menu:{}", latest_keys_in_menu.str());*/
+		//log::debug("latest_keys_in_menu:{}", latest_keys_in_menu.str());*/
 
 		MenuLayer::keyDown(key);
 		this->setKeyboardEnabled(1);
@@ -521,7 +521,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 				stream << "- " << (Loader::get()->isModLoaded(dep.id) ? "\\[<cg>WAS LOADED</c>\\]" : "\\[<cr>NOT LOADED</c>\\]");
 				stream << fmt::format(": [{}](mod:{})", dep.id, dep.id) << std::endl;
 			}
-			log::debug("{}", stream.str());
+			//log::debug("{}", stream.str());
 			auto list = MDTextArea::create(stream.str(), this->getContentSize() * 0.65);
 			list->getScrollLayer()->m_cutContent = 0;
 			menu->addChildAtPosition(list, Anchor::Center, { 0, 0 });

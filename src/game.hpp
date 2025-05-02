@@ -11,7 +11,7 @@ static inline std::map<int, const char*> UA_ADDITIONS = {
 #include <Geode/modify/ArtTriggerGameObject.hpp>
 class $modify(ArtTriggerGameObjectExt, ArtTriggerGameObject) {
 	virtual void triggerObject(GJBaseGameLayer * p0, int p1, gd::vector<int> const* p2) {
-		//log::debug("{}", __FUNCTION__);
+		//log::debug	//log::debug("{}", __FUNCTION__);
 		if (string::startsWith(fmt::format("{}", this->m_artIndex), "174200")) {
 
 			if (this->m_artIndex == 1742002) {
@@ -48,15 +48,15 @@ class $modify(EditorUIext, EditorUI) {
 	void editObject(cocos2d::CCObject * p0) {
 		EditorUI::editObject(p0);
 
-		log::debug("asd");
+		//log::debug("asd");
 
 		if (!this->m_editorLayer) return log::error("m_editorLayer = {}", m_editorLayer);
 		if (!this->m_editorLayer->getParent()) return log::error("m_editorLayer->getParent() = {}", m_editorLayer->getParent());
 		auto scene = this->m_editorLayer->getParent();
 
-		log::debug("scene = {}", scene);
+		//log::debug("scene = {}", scene);
 
-		log::debug("m_selectedObjectIndex = {}", m_selectedObjectIndex);
+		//log::debug("m_selectedObjectIndex = {}", m_selectedObjectIndex);
 
 		auto art_trigger = typeinfo_cast<ArtTriggerGameObject*>(m_selectedObject);
 		if (art_trigger) if (art_trigger->m_objectID == 3031) {
@@ -274,7 +274,7 @@ class $modify(PlayerObjectExt, PlayerObject) {
 				fmt::format("{}/"#name"{}.png", GEODE_MOD_ID, i).data()															\
 			)) frames->addObject(sprite->displayFrame());																		\
 			else log::warn("there is no {}/"#name"{}.png", GEODE_MOD_ID, i);													\
-			log::debug("{} {}", ""#name"", frames);																				\
+			//log::debug("{} {}", ""#name"", frames);																				\
 			name->runAction(CCRepeatForever::create(CCAnimate::create(CCAnimation::createWithSpriteFrames(frames, speed))));	\
 		};
 

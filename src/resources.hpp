@@ -43,7 +43,7 @@ class $modify(ResourcesLoader, GManager) {
                 log::error("rename err of {} to {}: {}", entry.string(), newPath.string(), ec.message());
             }
             else {
-                log::debug("renamed: \n{}\n v v v \n{}", entry.string(), newPath.string());
+                //log::debug("renamed: \n{}\n v v v \n{}", entry.string(), newPath.string());
             }
         }
 
