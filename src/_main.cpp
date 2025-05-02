@@ -156,6 +156,8 @@ public:
 			addChild(menu);
 		}
 
+		//(this);
+
 		addChild(SahderLayer::create("basic.vsh", "menu.fsh"));
 
 		this->setTouchEnabled(1);
@@ -188,9 +190,8 @@ class $modify(CCMenuItemSpriteExtraExt, CCMenuItemSpriteExtra) {
 };
 
 #include <Geode/modify/CCNode.hpp>
-class $modify(ColorsController, CCNode) {
-	$override void visit() {
-		if (this == nullptr) return;
+class $modify(NodeVisitController, CCNode) {
+	auto addShader() {
 		//add shader
 		if (typeinfo_cast<CCLayer*>(this)) if (!getChildByType<SahderLayer>(-1)) {
 			bool add = 0;
@@ -211,6 +212,8 @@ class $modify(ColorsController, CCNode) {
 			remove = typeinfo_cast<MenuLayer*>(this) ? 0 : remove;
 			if (remove) sahder->removeFromParent();
 		}
+	}
+	auto replaceColors() {
 		auto rgba_node = typeinfo_cast<CCNodeRGBA*>(this);
 		auto rgba_layr = typeinfo_cast<CCLayerRGBA*>(this);
 #define repl(org, tar) if (node->getColor() == org) node->setColor(tar);
@@ -240,15 +243,28 @@ class $modify(ColorsController, CCNode) {
 			if (node->getColor() == ccc3(168, 85, 44)) node->setOpacity(0);// frame-bg gd
 			repl(ccc3(114, 63, 31), ccc3(17, 17, 17));//search-id gd
 		};
+	}
+	$override void visit() {
 		CCNode::visit();
+		if (GameManager::get()->m_levelEditorLayer) return;
+		replaceColors();
+		addShader();
 	}
 };
 
 #include <Geode/modify/GameManager.hpp>
 class $modify(GameManagerExt, GameManager) {
 	$override gd::string getMenuMusicFile() {
-		static bool other_menu_music = rndb(3);
-		if (other_menu_music) return ("the_last_thing_she_sent_me.mp3");
+
+		static auto other_menu_musics = {
+			"the_last_thing_she_sent_me.mp3",
+			"DEADLY JAMS - Clocks (Crusty Mix).mp3"
+		};
+		static auto other_menu_music = *utils::select_randomly(other_menu_musics.begin(), other_menu_musics.end());
+
+		static bool with_other_menu_music = rndb();
+		if (with_other_menu_music) return (other_menu_music);
+
 		return GameManager::getMenuMusicFile();
 	}
 };
@@ -363,6 +379,90 @@ class $modify(MenuLayerExt, MenuLayer) {
 		}
 
 	}
+	void splashShowUp(float) {
+		log::debug("{}->{}", this, __FUNCTION__);
+		//sch runned on splash_text
+		auto splash_text = typeinfo_cast<SimpleTextArea*>(this);
+		if (splash_text) void(); else return;
+
+		if (auto menu = getChildByType<CCMenu>(0)) menu->setVisible(true);
+
+		auto apos = std::vector<float>{ 0.0f };
+		for (auto i = 5; i > 0; i--) apos.push_back((float)i / 10);
+		log::debug("apos {}", apos);
+		this->setAnchorPoint({
+			*utils::select_randomly(apos.begin(), apos.end()),
+			*utils::select_randomly(apos.begin(), apos.end())
+			});
+
+		this->runAction(CCSequence::create(
+			CCDelayTime::create(1.0f),
+			CallFuncExt::create(
+				[this, splash_text] {
+					log::debug("{}->runAction({})", this, __FUNCTION__);
+					if (auto menu = getChildByType<CCMenu>(0)) menu->setVisible(false);
+
+					std::vector<std::string> splash_texts = {
+						//glitvhsch
+						"suspect memory",
+						"corrupted dream",
+						"loading://deep_void",
+						"static hums",
+						//ua - the pocket dimension
+						"she didn't stop",
+						"red on her hands",
+						"can't unsee",
+						"you made her do it, feels cool huh?",
+						"too quiet now",
+						"the body's still warm",
+						"just a game, right? yah",
+						"click to bleed",
+						"it smiles back",
+						"mind world",
+						"hi",
+						//huh
+						"who's watching?",
+						"you aren't alone ig",
+						"look away :>",
+						"feed the tape",
+						"glitch in flesh",
+						"say her name",
+						"wait... did it blink?",
+						"wrong channels",
+						"insert coin to remember",
+						"eyes in the static",
+						//susie
+						"susie remembers smth",
+						"fifteen knife marks",
+						"her hands never shake, aint",
+						"she likes the pain",
+						"no regrets now. just blood.",
+						"she didn't cry",
+						"she cried at cool times",
+						"not broken. just rebuilt.",
+						"she won't stop?",
+						"knives talk louder",
+						"her smile cuts deep",
+						"16 y.o!?",
+						"16 years old",
+						"16 years old...",
+						//thrdabove
+						"she's still in there",
+						"haunted by herself",
+						"the redhead remembers",
+						"nobody taught her mercy?",
+						"a girl with rules... and a body count",
+						"don't let her look at you",
+						"hollow eyes, sharp mind"
+					};
+					splash_text->setText(*utils::select_randomly(splash_texts.begin(), splash_texts.end()));
+
+					auto dur = { 5.f, 5.5f, 3.f, 6.f, 4.5f, 4.2f, 7.2f, 8.7f };
+					this->scheduleOnce(schedule_selector(MenuLayerExt::splashShowUp), *utils::select_randomly(dur.begin(), dur.end()));
+				}
+			), nullptr
+		));
+	}
 	virtual void keyDown(cocos2d::enumKeyCodes key) {
 
 		std::set isPlayKey = {
@@ -445,6 +545,8 @@ class $modify(MenuLayerExt, MenuLayer) {
 		};
 
 		//gjFont30.fnt
+
+		//(this);
 		
 		auto menu = CCMenu::create();
 		menu->setID("menu"_spr);
@@ -496,7 +598,10 @@ menu->addChild(item); __VA_ARGS__													\
 					submenu->addChild(CCMenuItemExt::createSpriteExtra(
 						SimpleTextArea::create("runaways", "bigFont.fnt", 0.6f)->getLines()[0],
 						[this](CCNode* item) {
-
+							auto level = GJGameLevel::create();
+							level->m_levelString = "H4sIAAAAAAAACs1WWY4jMQi9kFNiMV40X32GPoBV332FOfyAqbSyVJFOJx-jRMbxgwfYmPjrk1vCkWHQQJLBg0QGogty4Yt5nHCUgQAw6sCBYkMbMNrAvzgmBdDPKPB1ir5LYTpu8CMSGma_R_TUlujv1znyOxKSw4TgGZpySPNkPG9Jqr6DZP-IniPR5TeQ7N-fJ0n2Tid9fSAnMCEuioucdCwJdaxzhTbcf2Ez8cndsSQ6Os8EPnIiHR1FcCWabORqlF3UuZjBBbrYNJ2KnIUdY8fYw8xOlp0si5s7xuya2YWHz-7PWpiJPgVuWbgdbeGiB6_ij7quIJrSKRdJyqsjsnkT40OxqWakymhRL1g1TAvcZmpOUNwc6iJtMuDCGu-3vepLUWBjUYhhPeEKS6k6sM3122FFXbRhStVpU8Cq-rxmNqluoTfItr6Aht4a3czdmFYqm_n5M4GF5FvnDnz8uco4L1mPQlMmWrq8NWW6zLgXqO3XGb-YLoNeHE2X2qwPmQnmxHaDxCoXZ8lRJ60JLTTqLdFSVXnWIOsFyF3VVVv3Cy82kOvrJSMWpuBa4KZk_qeKQUuoXGwfnRf75WLSi2n_EhtIFIESgS0AGSPQtjrlyDIEaxRQCB7R1iDaDBHIEVgebsIBKNGpSHQqEp1KiU6lRBvv4OnIND9GQ_DAa-0B2CgC5SF4EJCDR7m0aHtbVGM92t4eHUyP9q9Hpevgbi4d7Ylxwu__Y22LdNl17dWxWEvUeTPjOq8R2vuB9M2D2mcvGvdGBLedm7xz32laa7nW5KseD8Wj5GnCZxONUic1z5zN2jp3atbSJw9X9NhxRs4z9Hvn7dZ5vnKOO87bdJ4Dt4voQ-jW9T_oQz3j7w0AAA==";
+							level->m_levelDesc = "generated_plat";
+							CCDirector::get()->replaceScene(PlayLayer::scene(level, false, false));
 						}
 					));
 					submenu->setLayout(RowLayout::create()->setAxisAlignment(AxisAlignment::Start));
@@ -564,6 +669,31 @@ menu->addChild(item); __VA_ARGS__													\
 		this->addChildAtPosition(menu, Anchor::Left, {66.6f,0}, 0);
 
 		//menu->addChild(SahderLayer::create("basic.vsh", "menu.fsh"));
+
+		//splashes
+		auto splash_layer = CCLayer::create();
+		this->addChild(splash_layer, 10);
+
+		auto splash_text = SimpleTextArea::create("getting in to...");
+		splash_layer->addChildAtPosition(splash_text, Anchor::Bottom, { 0.f, 42.f }, 0);
+
+		splash_text->scheduleOnce(schedule_selector(MenuLayerExt::splashShowUp), 0.001f);
+
+		splash_layer->runAction(CCRepeatForever::create(CCSequence::create(
+			CCDelayTime::create(0.01),
+			CallFuncExt::create(
+				[splash_layer, splash_text] {
+					auto scl = { 0.78f,  0.76f,  0.77f,  0.755f };
+					splash_text->setScaleX(*utils::select_randomly(scl.begin(), scl.end()));
+					splash_text->setScaleY(*utils::select_randomly(scl.begin(), scl.end()));
+					auto opac = { 1, 7, 2, 1, 4, 9 };
+					splash_text->getLines()[0]->setOpacity(*utils::select_randomly(opac.begin(), opac.end()) + 5);
+					auto pos = { -2.f, -1.5f, -1.0f, 1.0f, 1.5f, 2.0f };
+					splash_layer->setPositionX(*utils::select_randomly(pos.begin(), pos.end()));
+					splash_layer->setPositionY(*utils::select_randomly(pos.begin(), pos.end()));
+				}
+			), nullptr
+		)));
 
 		//bg
 		auto bg = CCLayer::create();
