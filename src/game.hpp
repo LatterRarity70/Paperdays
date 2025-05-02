@@ -274,7 +274,6 @@ class $modify(PlayerObjectExt, PlayerObject) {
 				fmt::format("{}/"#name"{}.png", GEODE_MOD_ID, i).data()															\
 			)) frames->addObject(sprite->displayFrame());																		\
 			else log::warn("there is no {}/"#name"{}.png", GEODE_MOD_ID, i);													\
-			//log::debug("{} {}", ""#name"", frames);																				\
 			name->runAction(CCRepeatForever::create(CCAnimate::create(CCAnimation::createWithSpriteFrames(frames, speed))));	\
 		};
 
