@@ -163,8 +163,49 @@ class $modify(PlayerObjectExt, PlayerObject) {
 	bool showAnimPlr() {
 		return (this->m_isRobot) and !this->m_isDead;
 	}
-	void mySch(float) {
-		if (not this) return;
+	bool init(int p0, int p1, GJBaseGameLayer * p2, cocos2d::CCLayer * p3, bool p4) {
+		if (!PlayerObject::init(p0, p1, p2, p3, p4)) return false;
+
+		auto player_model_types = CCString::create("^player_susie_haunted,player_susie_normal");
+		setUserObject("player_model_types", player_model_types);
+
+		//add animations
+#define add(name, amount, speed)																								\
+		auto name = CCSprite::create(#name"1.png"_spr);																			\
+		if (name) {																												\
+			name->setID(#name""_spr);																							\
+			this->addChild(name);																								\
+			auto frames = CCArray::create();																					\
+			for (int i = 1; i <= amount; i++) if (auto sprite = CCSprite::create(												\
+				fmt::format("{}/"#name"{}.png", GEODE_MOD_ID, i).data()															\
+			)) frames->addObject(sprite->displayFrame());																		\
+			else log::warn("there is no {}/"#name"{}.png", GEODE_MOD_ID, i);													\
+			name->runAction(CCRepeatForever::create(CCAnimate::create(CCAnimation::createWithSpriteFrames(frames, speed))));	\
+		};
+
+		add(player_susie_haunted_idle, 5, 0.25f);
+		add(player_susie_haunted_run, 9, 0.07f);
+		add(player_susie_haunted_fall, 3, 0.035f);
+		add(player_susie_haunted_jump, 3, 0.035f);
+
+		add(player_susie_normal_idle, 5, 0.25f);
+		add(player_susie_normal_run, 9, 0.07f);
+		add(player_susie_normal_fall, 3, 0.035f);
+		add(player_susie_normal_jump, 3, 0.035f);
+
+#undef add
+
+		//particle effects
+		auto drag = "11a-1a0.68a1.27a-1a90a45a0a20a5a1a0a0a0a0a0a0a30a5a0a0a0.247059a0a0.243137a0a0.243137a0a0.352941a0a11a19a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a1a1a0a1a1a182a0a0a0a0a0a0a0a0a0a0a0a0a0a0";
+		GameToolbox::particleFromString(drag, this->m_playerGroundParticles, 0)->setUserObject("ps"_spr, CCStringMake(drag));
+
+		auto land = "11a0.16a0.68a1.27a-1a90a44a0a20a17a1a0a22a0a0a0a0a20a5a0a0a0.247059a0a0.243137a0a0.243137a0a0.352941a0a37a29a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a1a1a0a1a1a182a0a0a0a0a0a0a0a0a0a0a0a0a0a0";
+		GameToolbox::particleFromString(land, this->m_landParticles0, 0)->setUserObject("ps"_spr, CCStringMake(land));
+		GameToolbox::particleFromString(land, this->m_landParticles1, 0)->setUserObject("ps"_spr, CCStringMake(land));
+
+		return true;
+	}
+	virtual void update(float p0) {
 
 		m_fields->m_lastPlatformerXVelocity =
 			fabs(this->m_platformerXVelocity) > 0.001f ?
@@ -222,10 +263,13 @@ class $modify(PlayerObjectExt, PlayerObject) {
 				visible_sprite->setScaleX(mainLayer->getScaleX());
 				visible_sprite->setScaleY(mainLayer->getScaleY());
 
-				if (m_iconSprite) m_iconSprite->setDisplayFrame(visible_sprite->displayFrame());
-				if (m_iconSpriteSecondary) m_iconSpriteSecondary->setDisplayFrame(visible_sprite->displayFrame());
-				if (m_iconSpriteWhitener) m_iconSpriteWhitener->setDisplayFrame(visible_sprite->displayFrame());
-				if (m_iconGlow) m_iconGlow->setDisplayFrame(visible_sprite->displayFrame());
+				for (auto p : { m_iconSprite,m_iconSpriteSecondary,m_iconSpriteWhitener,m_iconGlow })
+					if (p) {
+						p->setDisplayFrame(visible_sprite->displayFrame());
+						p->setRotation(mainLayer->getRotation());
+						p->setScaleX(mainLayer->getScaleX());
+						p->setScaleY(mainLayer->getScaleY());
+					}
 
 				//step sound
 				auto waitForStepB = this->getChildByID("waitForStepB"_spr);
@@ -256,51 +300,22 @@ class $modify(PlayerObjectExt, PlayerObject) {
 		}
 
 		m_yVelocity = m_isUpsideDown ? -m_yVelocity : m_yVelocity;
-	}
-	bool init(int p0, int p1, GJBaseGameLayer * p2, cocos2d::CCLayer * p3, bool p4) {
-		if (!PlayerObject::init(p0, p1, p2, p3, p4)) return false;
 
-		auto player_model_types = CCString::create("^player_susie_haunted,player_susie_normal");
-		setUserObject("player_model_types", player_model_types);
+		PlayerObject::update(p0);
 
-		//add animations
-#define add(name, amount, speed)																								\
-		auto name = CCSprite::create(#name"1.png"_spr);																			\
-		if (name) {																												\
-			name->setID(#name""_spr);																							\
-			this->addChild(name);																								\
-			auto frames = CCArray::create();																					\
-			for (int i = 1; i <= amount; i++) if (auto sprite = CCSprite::create(												\
-				fmt::format("{}/"#name"{}.png", GEODE_MOD_ID, i).data()															\
-			)) frames->addObject(sprite->displayFrame());																		\
-			else log::warn("there is no {}/"#name"{}.png", GEODE_MOD_ID, i);													\
-			name->runAction(CCRepeatForever::create(CCAnimate::create(CCAnimation::createWithSpriteFrames(frames, speed))));	\
+		if (m_ghostTrail and showAnimPlr()) m_ghostTrail->m_position = CCPointZero;
+
+		cocos2d::ParticleStruct aaahhh;
+		for (auto ptr : { m_playerGroundParticles, m_landParticles0, m_landParticles1 }) if (ptr) {
+			if (auto str = typeinfo_cast<CCString*>(ptr->getUserObject("ps"_spr))) {
+				GameToolbox::particleStringToStruct(str->getCString(), aaahhh);
+				ptr->setGravity(CCPointMake(aaahhh.GravityX, aaahhh.GravityY));
+				ptr->setStartColor({ aaahhh.StartColorR, aaahhh.StartColorG, aaahhh.StartColorB, aaahhh.StartColorA });
+				ptr->setEndColor({ aaahhh.EndColorR, aaahhh.EndColorG, aaahhh.EndColorB, aaahhh.EndColorA });
+			};
+			ptr->setVisible(true);
 		};
-
-		add(player_susie_haunted_idle, 5, 0.25f);
-		add(player_susie_haunted_run, 9, 0.07f);
-		add(player_susie_haunted_fall, 3, 0.035f);
-		add(player_susie_haunted_jump, 3, 0.035f);
-
-		add(player_susie_normal_idle, 5, 0.25f);
-		add(player_susie_normal_run, 9, 0.07f);
-		add(player_susie_normal_fall, 3, 0.035f);
-		add(player_susie_normal_jump, 3, 0.035f);
-
-#undef add
-
-		this->schedule(schedule_selector(PlayerObjectExt::mySch));
-		
-        //particle effects
-		auto drag = "4a-1a0.9a0.35a20a90a45a75a20a5a1a0a-300a0a0a0a0a1a2a0a0a1a0.1a1a0.1a1a0.1a0.352941a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a1a1a0a1a1a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0";
-		GameToolbox::particleFromString(drag, this->m_playerGroundParticles, 0);
-
-		auto land = "8a0.02a0.84a0.35a-1a90a45a75a20a8a1a0a-300a0a0a0a0a1a2a0a0a1a0.1a1a0.1a1a0.1a0.352941a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a1a1a0a1a1a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0";
-		GameToolbox::particleFromString(land, this->m_landParticles0, 0);
-		GameToolbox::particleFromString(land, this->m_landParticles1, 0);
-
-		return true;
-	}
+	};
 };
 
 #include <Geode/modify/PlayLayer.hpp>
