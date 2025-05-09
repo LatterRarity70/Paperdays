@@ -339,6 +339,7 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 			loading_bg->setAnchorPoint(CCPointMake(0.f, 0.f));
 			loading_bg->setScaleX(getContentWidth() / loading_bg->getContentWidth());
 			loading_bg->setScaleY(getContentHeight() / loading_bg->getContentHeight());
+			loading_bg->setID("loading_bg"_spr);
 			this->addChild(loading_bg);
 		}
 
@@ -359,6 +360,7 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 			verLabel->setScale(0.337f);
 			verLabel->setAnchorPoint(CCPointMake(-0.025f, 1.5f));
 			verLabel->setOpacity(77);
+			verLabel->setID("verLabel"_spr);
 			this->addChild(verLabel);
 		};
 
@@ -545,8 +547,6 @@ class $modify(MenuLayerExt, MenuLayer) {
 		};
 
 		//gjFont30.fnt
-
-		//(this);
 		
 		auto menu = CCMenu::create();
 		menu->setID("menu"_spr);
@@ -668,13 +668,49 @@ menu->addChild(item); __VA_ARGS__													\
 		menu->setAnchorPoint({ 0.f, 0.5f });
 		this->addChildAtPosition(menu, Anchor::Left, {66.6f,0}, 0);
 
-		//menu->addChild(SahderLayer::create("basic.vsh", "menu.fsh"));
+		//verLabel
+		{
+			auto verLabel = CCLabelBMFont::create(
+				fmt::format(
+					"SDK {} at {} Platform, Release {} (Dev, {})",
+					Mod::get()->getMetadata().getGeodeVersion().toVString(),
+					GEODE_PLATFORM_NAME,
+					Mod::get()->getVersion().toVString(),
+					fs::file_size(getMod()->getPackagePath(), fs::last_err_code)
+				).c_str(),
+				"gjFont30.fnt",
+				kCCTextAlignmentLeft
+			);
+			verLabel->limitLabelWidth(92.f, 0.5f, 0.1f);
+			verLabel->setPositionY(this->getContentHeight());
+			verLabel->setScale(0.337f);
+			verLabel->setAnchorPoint(CCPointMake(-0.025f, 1.5f));
+			verLabel->setOpacity(77);
+			verLabel->setID("verLabel"_spr);
+			this->addChild(verLabel);
+		};
+
+		//bottom links
+		{
+			auto bottom_text = MDTextArea::create(
+				" [gamejolt](https://gamejolt.com/games/Umbral-Abyss/984458) "
+				" [itch.io](https://user95401.itch.io/umbral-abyss) "
+				" [github](https://github.com/user95401/Umbral-Abyss) "
+				" [telegram channel](https://github.com/user95401/Umbral-Abyss) "
+				, { this->getContentWidth(), 16.f }
+			);
+			bottom_text->setID("bottom_text"_spr);
+			bottom_text->getScrollLayer()->m_disableMovement = true;
+			this->addChildAtPosition(bottom_text, Anchor::Bottom, { 0.f, 12.f }, 0);
+		}
 
 		//splashes
 		auto splash_layer = CCLayer::create();
+		splash_layer->setID("splash_layer"_spr);
 		this->addChild(splash_layer, 10);
 
 		auto splash_text = SimpleTextArea::create("getting in to...");
+		splash_text->setID("splash_text"_spr);
 		splash_layer->addChildAtPosition(splash_text, Anchor::Bottom, { 0.f, 42.f }, 0);
 
 		splash_text->scheduleOnce(schedule_selector(MenuLayerExt::splashShowUp), 0.001f);
@@ -727,6 +763,7 @@ menu->addChild(item); __VA_ARGS__													\
 
 				shader->setUniformsForBuiltins();
 			};
+		shaderedBG->setID("shaderedBG"_spr);
 		bg->addChild(shaderedBG, 999);
 
 		auto bg0 = CCSprite::create("bg0.png"_spr);
