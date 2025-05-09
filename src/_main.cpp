@@ -700,6 +700,7 @@ menu->addChild(item); __VA_ARGS__													\
 				, { this->getContentWidth(), 16.f }
 			);
 			bottom_text->setID("bottom_text"_spr);
+			bottom_text->getScrollLayer()->m_cutContent = false;
 			bottom_text->getScrollLayer()->m_disableMovement = true;
 			this->addChildAtPosition(bottom_text, Anchor::Bottom, { 0.f, 12.f }, 0);
 		}
