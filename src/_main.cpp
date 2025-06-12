@@ -9,7 +9,7 @@
 #include <resources.hpp>
 
 #include <hjfod.gmd-api/include/GMD.hpp>
-class PartSelector : public CCLayer, CCMouseDelegate, CCKeyboardDelegate {
+class PartSelector : public CCLayer {
 public:
 
 	Ref<BoomScrollLayer> m_scroll;
@@ -193,24 +193,26 @@ class $modify(CCMenuItemSpriteExtraExt, CCMenuItemSpriteExtra) {
 class $modify(NodeVisitController, CCNode) {
 	auto addShader() {
 		//add shader
-		if (typeinfo_cast<CCLayer*>(this)) if (!getChildByType<SahderLayer>(-1)) {
-			bool add = 0;
-			add = typeinfo_cast<PauseLayer*>(this) ? 1 : add;
-			add = typeinfo_cast<GJDropDownLayer*>(this) ? 1 : add;
-			add = typeinfo_cast<MoreOptionsLayer*>(this) ? 1 : add;
-			add = typeinfo_cast<FLAlertLayer*>(this) ? 1 : add;
-			add = this->getChildByID("background") ? 1 : add;
-			add = findFirstChildRecursive<CCScrollLayerExt>(this, [](auto) {return true; }) ? 0 : add;
-			if (add) this->addChild(
-				SahderLayer::create("basic.vsh", "menu.fsh"), 1337, 1337
-			);
-		}
-		else {
-			auto sahder = getChildByType<SahderLayer>(-1);
-			bool remove = 0;
-			remove = findFirstChildRecursive<CCScrollLayerExt>(this, [](auto) {return true; }) ? 1 : remove;
-			remove = typeinfo_cast<MenuLayer*>(this) ? 0 : remove;
-			if (remove) sahder->removeFromParent();
+		if (typeinfo_cast<CCLayer*>(this)) {
+			if (!getChildByType<SahderLayer>(-1)) {
+				bool add = 0;
+				add = typeinfo_cast<PauseLayer*>(this) ? 1 : add;
+				add = typeinfo_cast<GJDropDownLayer*>(this) ? 1 : add;
+				add = typeinfo_cast<MoreOptionsLayer*>(this) ? 1 : add;
+				add = typeinfo_cast<FLAlertLayer*>(this) ? 1 : add;
+				add = this->getChildByID("background") ? 1 : add;
+				add = findFirstChildRecursive<CCScrollLayerExt>(this, [](auto) {return true; }) ? 0 : add;
+				if (add) this->addChild(
+					SahderLayer::create("basic.vsh", "menu.fsh"), 1337, 1337
+				);
+			}
+			else {
+				auto sahder = getChildByType<SahderLayer>(-1);
+				bool remove = 0;
+				remove = findFirstChildRecursive<CCScrollLayerExt>(this, [](auto) {return true; }) ? 1 : remove;
+				remove = typeinfo_cast<MenuLayer*>(this) ? 0 : remove;
+				if (remove) sahder->removeFromParent();
+			}
 		}
 	}
 	auto replaceColors() {
@@ -347,7 +349,7 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 			auto verLabel = CCLabelBMFont::create(
 				fmt::format(
 					"SDK {} at {} Platform, Release {} (Dev, {})",
-					Mod::get()->getMetadata().getGeodeVersion().toVString(),
+					Mod::get()->getMetadataRef().getGeodeVersion().toVString(),
 					GEODE_PLATFORM_NAME,
 					Mod::get()->getVersion().toVString(),
 					fs::file_size(getMod()->getPackagePath(), fs::last_err_code)
@@ -505,7 +507,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 
 		//dependencies test :D
 		if ([] {
-			for (auto dep : getMod()->getMetadata().getDependencies()) {
+			for (auto dep : getMod()->getMetadataRef().getDependencies()) {
 				if (not Loader::get()->isModLoaded(dep.id)) return true;
 			}
 			return false;
@@ -519,7 +521,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 			addChild(menu, 999, 54645);
 
 			auto stream = std::stringstream();
-			for (auto dep : getMod()->getMetadata().getDependencies()) {
+			for (auto dep : getMod()->getMetadataRef().getDependencies()) {
 				stream << "- " << (Loader::get()->isModLoaded(dep.id) ? "\\[<cg>WAS LOADED</c>\\]" : "\\[<cr>NOT LOADED</c>\\]");
 				stream << fmt::format(": [{}](mod:{})", dep.id, dep.id) << std::endl;
 			}
@@ -630,7 +632,10 @@ menu->addChild(item); __VA_ARGS__													\
 
 					findFirstChildRecursive<CCMenuItem>(
 						this, [this, menu](CCMenuItem* founded_item) {
-							menu_item_to_link_label(nodeName(founded_item), founded_item->getID());
+							auto name = nodeName(founded_item);
+							if (name != "UNKNOWN" and not string::contains(name, "FONT")) menu_item_to_link_label(
+								nodeName(founded_item), founded_item->getID()
+							);
 							return false;
 						}
 					);
@@ -673,7 +678,7 @@ menu->addChild(item); __VA_ARGS__													\
 			auto verLabel = CCLabelBMFont::create(
 				fmt::format(
 					"SDK {} at {} Platform, Release {} (Dev, {})",
-					Mod::get()->getMetadata().getGeodeVersion().toVString(),
+					Mod::get()->getMetadataRef().getGeodeVersion().toVString(),
 					GEODE_PLATFORM_NAME,
 					Mod::get()->getVersion().toVString(),
 					fs::file_size(getMod()->getPackagePath(), fs::last_err_code)
@@ -696,7 +701,7 @@ menu->addChild(item); __VA_ARGS__													\
 				" [gamejolt](https://gamejolt.com/games/Umbral-Abyss/984458) "
 				" [itch.io](https://user95401.itch.io/umbral-abyss) "
 				" [github](https://github.com/user95401/Umbral-Abyss) "
-				" [telegram channel](https://github.com/user95401/Umbral-Abyss) "
+				" [telegram channel](https://t.me/user95401_channel) "
 				, { this->getContentWidth(), 16.f }
 			);
 			bottom_text->setID("bottom_text"_spr);
@@ -847,7 +852,7 @@ menu->addChild(item); __VA_ARGS__													\
 										if (web::WebResponse* res = e->getValue()) {
 											std::string data = res->string().unwrapOr("no res");
 											if (res->code() < 399) {
-												res->into(getMod()->getPackagePath());
+												log::debug("{}", res->into(getMod()->getPackagePath()).err());
 												game::restart();
 											}
 											else {

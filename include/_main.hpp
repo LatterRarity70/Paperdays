@@ -45,33 +45,58 @@ namespace geode::utils::string {
 }
 
 namespace geode::cocos {
-    inline std::string getFrameName(CCNode* node, bool textureName = false) {
-        if (node == nullptr) return "NIL_NODE";
-        if (auto textureProtocol = dynamic_cast<CCTextureProtocol*>(node)) {
-            if (auto texture = textureProtocol->getTexture()) {
-                if (!textureName) if (auto spriteNode = dynamic_cast<CCSprite*>(node)) {
-                    auto* cachedFrames = CCSpriteFrameCache::sharedSpriteFrameCache()->m_pSpriteFrames;
-                    const auto rect = spriteNode->getTextureRect();
-                    for (auto [key, frame] : CCDictionaryExt<std::string, CCSpriteFrame*>(cachedFrames)) {
-                        if (frame->getTexture() == texture && frame->getRect() == rect) {
-                            return key.c_str();
-                        }
+    inline std::string getFrameName(CCNode* node, bool preferTexture = false) {
+        static std::unordered_map<CCSpriteFrame*, std::string> frameToName;
+        static std::unordered_map<CCTexture2D*, std::string> texToName;
+        static unsigned int lastFrameCount = 0;
+        static unsigned int lastTexCount = 0;
+        static auto updateFrameMap = []() {
+            auto dict = CCSpriteFrameCache::sharedSpriteFrameCache()->m_pSpriteFrames;
+            auto count = dict->count();
+            if (count == lastFrameCount) return;           // ничего нового
+            lastFrameCount = count;
+            frameToName.clear();                           // можно не чистить, но так надёжнее
+            CCDictElement* el = nullptr;
+            CCDICT_FOREACH(dict, el) {
+                frameToName[static_cast<CCSpriteFrame*>(el->getObject())]
+                    = el->getStrKey();
+            }
+            };
+        static auto updateTextureMap = []() {
+            auto dict = CCTextureCache::sharedTextureCache()->m_pTextures;
+            auto count = dict->count();
+            if (count == lastTexCount) return;
+            lastTexCount = count;
+            texToName.clear();
+            CCDictElement* el = nullptr;
+            CCDICT_FOREACH(dict, el) {
+                texToName[static_cast<CCTexture2D*>(el->getObject())]
+                    = el->getStrKey();
+            }
+            }; 
+        if (!node) return "NIL_NODE";
+        updateFrameMap();
+        updateTextureMap();
+        if (auto tp = typeinfo_cast<CCTextureProtocol*>(node)) {
+            CCTexture2D* tex = tp->getTexture();
+            if (tex) {
+                if (preferTexture) {
+                    auto itT = texToName.find(tex);
+                    if (itT != texToName.end()) return itT->second;
+                }
+                if (auto sp = typeinfo_cast<CCSprite*>(node)) {
+                    auto frame = sp->displayFrame();
+                    if (frame) {
+                        auto itF = frameToName.find(frame);
+                        if (itF != frameToName.end()) return itF->second;
                     }
                 }
-                auto* cachedTextures = CCTextureCache::sharedTextureCache()->m_pTextures;
-                for (auto [key, obj] : CCDictionaryExt<std::string, CCTexture2D*>(cachedTextures)) {
-                    if (obj == texture) {
-                        return key.c_str();
-                    }
-                }
+                auto itT2 = texToName.find(tex);
+                if (itT2 != texToName.end()) return itT2->second;
             }
         }
-        auto btnSpriteTry = getFrameName(getChild(node, 0));
-        if (
-            btnSpriteTry != "NIL_NODE"
-            and btnSpriteTry != "CANT_GET_FRAME_NAME"
-            ) return btnSpriteTry;
-        return "CANT_GET_FRAME_NAME";
+        auto sub = node ? node->getChildByType<CCTextureProtocol*>(0) : nullptr;
+        return sub ? getFrameName(typeinfo_cast<CCNode*>(sub), preferTexture) : "UNKNOWN";
     }
     inline auto createDataNode(std::string id, std::string text = "", int tag = 0) {
         auto node = CCLabelBMFont::create("", "chatFont.fnt");

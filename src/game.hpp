@@ -2,147 +2,175 @@
 
 #define in_range(tar, from, to) (tar >= from and tar <= to)
 
-static inline std::map<int, const char*> UA_ADDITIONS = {
-	{ 0, "no special action" },
-	{ 1742001, "switch player model" },
-	{ 1742002, "toggle platformer" },
+enum ua_addition {
+	none = 10
+	, set_to_player_susie_haunted
+	, set_to_player_susie_normal
+	, push_jump_button
+	, release_jump_button
+	, push_left_button
+	, release_left_button
+	, push_right_button
+	, release_right_button
+	, enable_platformer
+	, disable_platformer
+	, playDeathEffect
+	, animatePlatformerJump
+	, playSpawnEffect
+	, tryPlaceCheckpoint
+	, playExitDualEffect
+};
+static inline std::map<const char*, int> UA_ADDITIONS = {
+	{ "set to player_susie_haunted", ua_addition::set_to_player_susie_haunted },
+	{ "set to player_susie_normal", ua_addition::set_to_player_susie_normal },
+	{ "push jump button", ua_addition::push_jump_button },
+	{ "release jump button", ua_addition::release_jump_button },
+	{ "push left button", ua_addition::push_left_button },
+	{ "release left button", ua_addition::release_left_button },
+	{ "push right button", ua_addition::push_right_button },
+	{ "release right button", ua_addition::release_right_button },
+	{ "enable platformer", ua_addition::enable_platformer },
+	{ "disable platformer", ua_addition::disable_platformer },
+	{ "play death effect", ua_addition::playDeathEffect },
+	{ "animate platformer jump (uses trigger object scale!)", ua_addition::animatePlatformerJump },
+	{ "play spawn effect", ua_addition::playSpawnEffect },
+	{ "try place checkpoint", ua_addition::tryPlaceCheckpoint },
+	{ "play exit dual effect", ua_addition::playExitDualEffect }
 };
 
-#include <Geode/modify/ArtTriggerGameObject.hpp>
-class $modify(ArtTriggerGameObjectExt, ArtTriggerGameObject) {
-	virtual void triggerObject(GJBaseGameLayer * p0, int p1, gd::vector<int> const* p2) {
-		//log::debug	//log::debug("{}", __FUNCTION__);
-		if (string::startsWith(fmt::format("{}", this->m_artIndex), "174200")) {
+#include <Geode/modify/SetupEventLinkPopup.hpp>
+#include <MDInfoAlertButton.hpp>
+class $modify(SetupEventLinkPopupExt, SetupEventLinkPopup) {
+	bool init(EventLinkTrigger * p0, cocos2d::CCArray * p1) {
+		if(!SetupEventLinkPopup::init(p0, p1)) return false;
+		
+		auto str = std::string();
+		for (auto i : UA_ADDITIONS) str += fmt::format(
+			"- <c-{}f>{}</c> - {}\n", 
+			i.second, i.second, i.first
+		);
 
-			if (this->m_artIndex == 1742002) {
-				p0->m_player1->m_isPlatformer = !p0->m_player1->m_isPlatformer;
-				p0->m_isPlatformer = !p0->m_isPlatformer;
-			}
+		auto infLabel = MDInfoAlertButton::create("Umbral Abyss Additions", str.c_str(), 0.575f);
+		infLabel->setPosition(CCPointMake(130.f, 105.f));
+		this->m_buttonMenu->addChild(infLabel);
 
-			if (this->m_artIndex == 1742001) {
-				auto player_model_types_str_obj = typeinfo_cast<CCString*>(p0->m_player1->getUserObject("player_model_types"));
-				auto player_model_types = player_model_types_str_obj ? string::split(player_model_types_str_obj->getCString(), ",") : std::vector<std::string>{};
-				auto new_set = std::vector<std::string>();
-				auto sel_next = false;
-				for (auto type : player_model_types) {
-					if (string::startsWith(type, "^")) {
-						new_set.push_back(std::string(type.begin() + 1, type.end()));
-						sel_next = true;
-					}
-					else {
-						new_set.push_back(sel_next ? ("^" + type) : type);
-						sel_next = false;
-					}
-				}
-				auto new_set_str = string::join(new_set, ",");
-				player_model_types_str_obj->m_sString = (string::contains(new_set_str, "^") ? new_set_str : "^" + new_set_str).c_str();
-			};
-
-		}
-		else ArtTriggerGameObject::triggerObject(p0, p1, p2);
-	};
-};
-
-#include <Geode/modify/EditorUI.hpp>
-class $modify(EditorUIext, EditorUI) {
-	void editObject(cocos2d::CCObject * p0) {
-		EditorUI::editObject(p0);
-
-		//log::debug("asd");
-
-		if (!this->m_editorLayer) return log::error("m_editorLayer = {}", m_editorLayer);
-		if (!this->m_editorLayer->getParent()) return log::error("m_editorLayer->getParent() = {}", m_editorLayer->getParent());
-		auto scene = this->m_editorLayer->getParent();
-
-		//log::debug("scene = {}", scene);
-
-		//log::debug("m_selectedObjectIndex = {}", m_selectedObjectIndex);
-
-		auto art_trigger = typeinfo_cast<ArtTriggerGameObject*>(m_selectedObject);
-		if (art_trigger) if (art_trigger->m_objectID == 3031) {
-			findFirstChildRecursive<SetupArtSwitchPopup>(scene, [art_trigger](SetupArtSwitchPopup* popup) {
-
-				auto label = SimpleTextArea::create("UA ADDITION:    [0000000]", "bigFont.fnt");
-				label->setPosition(CCPointMake(-8.000f, -36.000f));
-				label->setScale(0.5f);
-				label->runAction(CCRepeatForever::create(CCSpawn::create(CallFuncExt::create([label, art_trigger] {
-					if (art_trigger and label) label->setText(fmt::format(
-						"UA ADDITION:    [{}]", art_trigger->m_artIndex
-					).c_str());
-					}), nullptr)));
-				label->setID("label"_spr);
-				popup->m_buttonMenu->addChild(label);
-
-				auto image = ButtonSprite::create(" no spetial action ");
-				image->setScale(0.8f);
-
-				auto btn = CCMenuItemExt::createSpriteExtra(image, [image, art_trigger](auto) {
-
-					for (auto one : UA_ADDITIONS) {
-						if (art_trigger->m_artIndex == one.first) continue;
-						art_trigger->m_artIndex = one.first;
-						break;
-					}
-					image->m_label->setString(UA_ADDITIONS.at(art_trigger->m_artIndex));
-					limitNodeSize(image->m_label, image->getContentSize() * 0.8, 1337.f, 0.1f);
-
-					});
-				image->m_label->setString(UA_ADDITIONS.at(art_trigger->m_artIndex));
-				limitNodeSize(image->m_label, image->getContentSize() * 0.8, 1337.f, 0.1f);
-
-				btn->setID("btn"_spr);
-				btn->setPosition(CCPointMake(90.000f, -42.000f));
-
-				popup->m_buttonMenu->addChild(btn);
-
-				return true;
-
-				});
-		}
-	};
+		return true;
+	}
 };
 
 #include <Geode/modify/GJBaseGameLayer.hpp>
-class $modify(GJBaseGameLayerSoundEvents, GJBaseGameLayer) {
+class $modify(GJBaseGameLayerEventsExt, GJBaseGameLayer) {
+	void activateEventTrigger(EventLinkTrigger * p0, gd::vector<int> const& p1) {
+
+		typedef ua_addition a;
+		auto eID = p0->m_extraID2;
+		for (auto player : { m_player1, m_player2 }) if (player) {
+
+			if (eID == a::enable_platformer) {
+				player->m_isPlatformer = true;
+				m_isPlatformer = true;
+			}
+			if (eID == a::disable_platformer) {
+				player->m_isPlatformer = false;
+				m_isPlatformer = false;
+			}
+
+			if (eID == a::set_to_player_susie_haunted) {
+				auto strOBJ = typeinfo_cast<CCString*>(player->getUserObject("player_model_type"));
+				if (strOBJ) strOBJ->initWithFormat("%s", "player_susie_haunted");
+			};
+			if (eID == a::set_to_player_susie_normal) {
+				auto strOBJ = typeinfo_cast<CCString*>(player->getUserObject("player_model_type"));
+				if (strOBJ) strOBJ->initWithFormat("%s", "player_susie_normal");
+			};
+
+			if (eID == a::push_jump_button) player->pushButton(PlayerButton::Jump);
+			if (eID == a::release_jump_button) player->releaseButton(PlayerButton::Jump);
+			if (eID == a::push_left_button) player->pushButton(PlayerButton::Left);
+			if (eID == a::release_left_button) player->releaseButton(PlayerButton::Left);
+			if (eID == a::push_right_button) player->pushButton(PlayerButton::Right);
+			if (eID == a::release_right_button) player->releaseButton(PlayerButton::Right);
+
+			if (eID == a::playDeathEffect) {
+				player->playDeathEffect();
+				player->resetObject();
+			}
+			if (eID == a::animatePlatformerJump) player->animatePlatformerJump(p0->getScale());
+			if (eID == a::playSpawnEffect) player->playSpawnEffect();
+			if (eID == a::tryPlaceCheckpoint) player->tryPlaceCheckpoint();
+			if (eID == a::playExitDualEffect) playExitDualEffect(player);
+		};
+
+		GJBaseGameLayer::activateEventTrigger(p0, p1);
+	};
 	void gameEventTriggered(GJGameEvent p0, int p1, int p2) {
 		auto eventID = static_cast<int>(p0);
 		auto audio = FMODAudioEngine::get();
-		if (eventID >= 2 and eventID <= 5) {//landing
-			if (m_player1->m_isRobot) audio->playEffect("step_landing.ogg", 1.f, 1.f / eventID, 0.9f + (eventID / 10));
-		}
-		if (eventID >= 12 and eventID <= 13) {//jump
-			if (m_player1->m_isRobot) {
-
-				if (!m_player1->getActionByTag(5718932)) {
-					auto jump_anim = CCSequence::create(
-						CCEaseBackOut::create(CCScaleTo::create(
-							0.1f, m_player1->getScaleX() - 0.15f, m_player1->getScaleY() + 0.15f
-						)),
-						CCEaseSineOut::create(CCScaleTo::create(
-							0.15f, m_player1->getScale(), m_player1->getScaleX()
-						)),
-						nullptr
-					);
-					jump_anim->setTag(5718932);
-					m_player1->runAction(jump_anim);
-				};
-
-				audio->playEffect("step_jump.ogg", 1.f, 1.f, 1.f);
+		for (auto player : { m_player1, m_player2 }) if (player) {
+			if (eventID >= 2 and eventID <= 5) {//landing
+				if (player->m_isRobot) audio->playEffect("step_landing.ogg", 1.f, 1.f / eventID, 0.9f + (eventID / 10));
 			}
-		}
-		if (eventID == 23) {//dash
-			auto dashes = {
-				"dash1.ogg","dash2.ogg","dash3.ogg","dash4.ogg","dash5.ogg"
-			};
-			if (m_player1->m_isRobot) audio->playEffect(*select_randomly(dashes.begin(), dashes.end()), 1.f, 1.f, 1.f);
+			if (eventID >= 12 and eventID <= 13) {//jump
+				if (player->m_isRobot) {
+
+					if (!player->getActionByTag(5718932)) {
+						auto jump_anim = CCSequence::create(
+							CCEaseBackOut::create(CCScaleTo::create(
+								0.1f, player->getScaleX() - 0.15f, player->getScaleY() + 0.15f
+							)),
+							CCEaseSineOut::create(CCScaleTo::create(
+								0.15f, player->getScale(), player->getScaleX()
+							)),
+							nullptr
+						);
+						jump_anim->setTag(5718932);
+						player->runAction(jump_anim);
+					};
+
+					audio->playEffect("step_jump.ogg", 1.f, 1.f, 1.f);
+				}
+			}
+			if (eventID == 23) {//dash
+				auto dashes = {
+					"dash1.ogg","dash2.ogg","dash3.ogg","dash4.ogg","dash5.ogg"
+				};
+				if (player->m_isRobot) audio->playEffect(*select_randomly(dashes.begin(), dashes.end()), 1.f, 1.f, 1.f);
+			}
 		}
 		GJBaseGameLayer::gameEventTriggered(p0, p1, p2);
 	};
 };
 
+#include <Geode/modify/GameObject.hpp>
+class $modify(TextGameObjectExt, GameObject) {
+	void textSetsupExt(float = 0.f) {
+		CCSize size = this->getContentSize();
+		this->m_width = size.width;
+		this->m_height = size.height;
+		this->m_objectType = GameObjectType::Solid;
+		this->m_isPassable = true;
+		this->m_isTrigger = true;
+	}
+	void customSetup() {
+		GameObject::customSetup();
+		if (auto textobject = typeinfo_cast<TextGameObject*>(this)) {
+			textSetsupExt();
+			this->schedule(schedule_selector(TextGameObjectExt::textSetsupExt));
+		}
+	}
+};
+
 #include <Geode/modify/PlayerObject.hpp>
 class $modify(PlayerObjectExt, PlayerObject) {
-	struct Fields {
+	struct Fields : DialogDelegate {
+		PlayerObject* self;
+		DialogLayer* dialogLayer = nullptr;
+		virtual void dialogClosed(DialogLayer* p0) {
+			self->m_controlsDisabled = (true);
+			self->enablePlayerControls();
+			self->releaseAllButtons();
+			dialogLayer = nullptr;
+		};
 		float m_lastPlatformerXVelocity = 0.1;
 	};
 	bool isCube() {
@@ -152,7 +180,7 @@ class $modify(PlayerObjectExt, PlayerObject) {
 		return false;
 	}
 	bool isStanding() {
-		return fabs(this->m_platformerXVelocity) < 0.25f and this->m_isPlatformer;
+		return fabs(this->m_platformerXVelocity) < 0.25f;
 	}
 	bool isOnAir() {
 		return !this->m_isOnGround or !in_range(m_yVelocity, -5.2f, 5.2f);
@@ -165,9 +193,10 @@ class $modify(PlayerObjectExt, PlayerObject) {
 	}
 	bool init(int p0, int p1, GJBaseGameLayer * p2, cocos2d::CCLayer * p3, bool p4) {
 		if (!PlayerObject::init(p0, p1, p2, p3, p4)) return false;
+		m_fields->self = this;
 
-		auto player_model_types = CCString::create("^player_susie_haunted,player_susie_normal");
-		setUserObject("player_model_types", player_model_types);
+		auto player_model_type = CCString::create("player_susie_haunted");
+		setUserObject("player_model_type", player_model_type);
 
 		//add animations
 #define add(name, amount, speed)																								\
@@ -221,19 +250,17 @@ class $modify(PlayerObjectExt, PlayerObject) {
 		//this->setRScale(size.width);
 		//this->setRScaleY(size.width);
 
-		auto player_model_types_str_obj = typeinfo_cast<CCString*>(getUserObject("player_model_types"));
-		//log::debug("{}", player_model_types_str_obj->getCString());
-		auto player_model_types = player_model_types_str_obj ? string::split(player_model_types_str_obj->getCString(), ",") : std::vector<std::string>{};
-		auto player_model_type = std::string();
-		for (auto type : player_model_types) if (string::startsWith(type, "^")) player_model_type = std::string(type.begin() + 1, type.end());
+		auto player_model_type_str_obj = typeinfo_cast<CCString*>(getUserObject("player_model_type"));
+		//log::debug("{}", player_model_type_str_obj->getCString());
+		std::string player_model_type = player_model_type_str_obj ? player_model_type_str_obj->getCString() : "player_susie_normal";
 
 		//log::debug("{}", player_model_type);
 
-		auto mainLayer = this->getChildByIDRecursive("main-layer");
-		auto spr_player_idle = typeinfo_cast<CCSprite*>(this->getChildByIDRecursive(""_spr + player_model_type + "_idle"));
-		auto spr_player_run = typeinfo_cast<CCSprite*>(this->getChildByIDRecursive(""_spr + player_model_type + "_run"));
-		auto spr_player_fall = typeinfo_cast<CCSprite*>(this->getChildByIDRecursive(""_spr + player_model_type + "_fall"));
-		auto spr_player_jump = typeinfo_cast<CCSprite*>(this->getChildByIDRecursive(""_spr + player_model_type + "_jump"));
+		auto mainLayer = this->querySelector("main-layer");
+		auto spr_player_idle = typeinfo_cast<CCSprite*>(this->querySelector(""_spr + player_model_type + "_idle"));
+		auto spr_player_run = typeinfo_cast<CCSprite*>(this->querySelector(""_spr + player_model_type + "_run"));
+		auto spr_player_fall = typeinfo_cast<CCSprite*>(this->querySelector(""_spr + player_model_type + "_fall"));
+		auto spr_player_jump = typeinfo_cast<CCSprite*>(this->querySelector(""_spr + player_model_type + "_jump"));
 		if (spr_player_idle and spr_player_run and mainLayer) {
 			mainLayer->setVisible(!showAnimPlr());
 			static CCPoint hidep = { 9999999.f, 9999999.f };
@@ -263,37 +290,34 @@ class $modify(PlayerObjectExt, PlayerObject) {
 				visible_sprite->setScaleX(mainLayer->getScaleX());
 				visible_sprite->setScaleY(mainLayer->getScaleY());
 
-				for (auto p : { m_iconSprite,m_iconSpriteSecondary,m_iconSpriteWhitener,m_iconGlow })
-					if (p) {
-						p->setDisplayFrame(visible_sprite->displayFrame());
-						p->setRotation(mainLayer->getRotation());
-						p->setScaleX(mainLayer->getScaleX());
-						p->setScaleY(mainLayer->getScaleY());
-					}
+				for (auto p : { m_iconSprite,m_iconSpriteSecondary,m_iconSpriteWhitener,m_iconGlow }) if (p) {
+					p->setDisplayFrame(visible_sprite->displayFrame());
+					p->setRotation(mainLayer->getRotation());
+					p->setScaleX(mainLayer->getScaleX());
+					p->setScaleY(mainLayer->getScaleY());
+				};
 
 				//step sound
-				auto waitForStepB = this->getChildByID("waitForStepB"_spr);
+				auto waitForStepB = this->getUserObject("waitForStepB"_spr);
 				if (string::contains(name, "run")) {
 					if (!waitForStepB) {
-						waitForStepB = createDataNode("waitForStepB"_spr);
-						this->addChild(waitForStepB);
+						waitForStepB = new CCObject(); 
+						waitForStepB->autorelease();
+						this->setUserObject("waitForStepB"_spr, waitForStepB);
 					}
-
-					if (string::contains(name, "run1") and !waitForStepB->isVisible()) {
+					if (string::contains(name, "run1") and !waitForStepB->m_nTag) {
 						FMODAudioEngine::sharedEngine()->playEffect("step_a.ogg", 1.f, 1.f, 1.f);
-						waitForStepB->setVisible(true);
+						waitForStepB->m_nTag = (true);
 					}
-					if (string::contains(name, "run6") and waitForStepB->isVisible()) {
+					if (string::contains(name, "run6") and waitForStepB->m_nTag) {
 						FMODAudioEngine::sharedEngine()->playEffect("step_b.ogg", 1.f, 1.f, 1.f);
-						waitForStepB->setVisible(false);
+						waitForStepB->m_nTag = (false);
 					}
-
-					if (fabs(m_fields->m_lastPlatformerXVelocity) == 0.45f) FMODAudioEngine::sharedEngine
-					()->playEffect("step_a.ogg", 1.f, 1.f, 1.f
-					);
-
+					if (fabs(m_fields->m_lastPlatformerXVelocity) == 0.45f) {
+						FMODAudioEngine::sharedEngine()->playEffect("step_a.ogg", 1.f, 1.f, 1.f);
+					}
 				}
-				else if (waitForStepB) waitForStepB->setVisible(false);
+				else if (waitForStepB) waitForStepB->m_nTag = (false);
 			};
 
 			this->m_robotBurstParticles->setVisible(0);
@@ -315,6 +339,71 @@ class $modify(PlayerObjectExt, PlayerObject) {
 			};
 			ptr->setVisible(true);
 		};
+	};
+	void collidedWithObject(float p0, GameObject* p1, cocos2d::CCRect p2, bool p3) {
+		if (auto textObj = typeinfo_cast<TextGameObject*>(p1)) {
+
+			std::string str = textObj->m_text.c_str();
+			if (m_fields->dialogLayer) {
+				auto anyIsHeld = false;
+				for (auto btn : m_holdingButtons) anyIsHeld = btn.second ? btn.second : anyIsHeld;
+				if (anyIsHeld) {
+					m_fields->dialogLayer->handleDialogTap();
+				};
+			};
+			if (m_controlsDisabled) this->m_holdingButtons.clear();
+			if (string::startsWith(str, "dialog:") and this->m_holdingButtons[1] and isStanding()) {
+				this->m_controlsDisabled = (true);
+				this->disablePlayerControls();
+				this->releaseAllButtons();
+
+				auto raw_data = string::replace(str, "dialog:", "[ ") + "]";
+				auto data = matjson::parse(raw_data).unwrapOrDefault();
+
+				/*
+					example text:
+					```
+					dialog:1,"char:the noone","<cr>hi!</c> why ar u here ever?","!","its feels bad you here"
+					```
+				*/
+
+				auto not_skippable = true;
+				auto character = std::string("???");
+				auto characterFrame = 0;
+
+				auto dialogObjectsArr = CCArrayExt<DialogObject>();
+
+				for (auto& val : data) {
+					if (val.isNumber()) characterFrame = val.asInt().unwrapOrDefault();
+					if (val.isString()) {
+						auto text = val.asString().unwrapOrDefault();
+						if (string::startsWith(text, "!")) {
+							not_skippable = false;
+							continue;
+						}
+						if (string::startsWith(text, "char:")) {
+							character = string::replace(text, "char:", "");
+							continue;
+						}
+						//(character, text, characterFrame, skippable, cocos2d::ccColor3B color);
+						dialogObjectsArr.push_back(DialogObject::create(
+							character, text, characterFrame, 1.f, not not_skippable, ccWHITE
+						));
+					}
+				}
+				if (m_fields->dialogLayer) m_fields->dialogLayer->removeFromParent();
+				m_fields->dialogLayer = DialogLayer::createDialogLayer(
+					dialogObjectsArr[0], dialogObjectsArr.inner(), 1
+				);
+				m_fields->dialogLayer->m_delegate = m_fields.self();
+				m_fields->dialogLayer->updateChatPlacement(DialogChatPlacement::Bottom);
+				m_gameLayer->m_uiLayer->addChild(m_fields->dialogLayer);
+				m_fields->dialogLayer->animateInRandomSide();
+			}
+
+			return;
+		}
+		PlayerObject::collidedWithObject(p0, p1, p2, p3);
 	};
 };
 
