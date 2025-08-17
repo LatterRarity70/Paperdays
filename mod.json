@@ -1,33 +1,47 @@
 {
-	"geode": "4.5.0",
+	"geode": "4.7.0",
 	"early-load": true,
 	"gd": {
 		"win": "2.2074",
 		"android": "2.2074"
 	},
-	"id": "user95401.umbral-abyss",
-	"name": "Umbral Abyss",
+	"id": "lr70.paperdays",
+	"name": "Paperdays",
 	"version": "v0.0.0-beta",
-	"developer": "user95401",
+	"developers": [ "LatterRarity70" ],
 	"description": "turns geometry dash to my first game ever",
 	"tags": [ "interface", "offline", "gameplay", "content" ],
 	"links": {
 		"community": "https://discord.gg/6SxAbk3bTA",
-		"homepage": "https://t.me/user95401_channel",
-		"source": "https://github.com/user95401/Umbral-Abyss"
+		"homepage": "https://t.me/LatterRarity70_channel",
+		"source": "https://github.com/LatterRarity70/Paperdays"
 	},
 	"dependencies": [
 		{
 			"id": "geode.node-ids",
 			"version": ">=v1.13.1",
 			"importance": "recommended"
-		},
-		{
-			"id": "hjfod.gmd-api",
-			"version": "1.4.1"
 		}
 	],
 	"resources": {
+		"fonts": {
+			"bigFont": {
+				"path": "assets/KislicinGraffiti.otf",
+				"size": 82
+			},
+			"goldFont": {
+				"path": "assets/KislicinGraffiti.otf",
+				"size": 74
+			},
+			"chatFont": {
+				"path": "assets/TravelingTypewriter.ttf",
+				"size": 58
+			},
+			"GhastlyPanicCyr": {
+				"path": "assets/GhastlyPanicCyr.otf",
+				"size": 74
+			}
+		},
 		"files": [
 			"assets/files/**/*.*"
 		],

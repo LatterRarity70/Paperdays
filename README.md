@@ -1,13 +1,12 @@
-## Umbral Abyss
+## Paperdays
 
 upcoming game-in-game modification... xd
 
 - dark interface and new sounds
-- new levels (story ones and infinity run)
-- new game-modes: infinity run, story mode
 - animated char
+- new levels
 
-\- user95401, Umbral Abyss
+\- LatterRarity70, Paperdays
 
 <img src="logo.png" width="150" alt="the mod's logo" />
 
