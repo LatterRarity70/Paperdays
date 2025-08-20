@@ -1,0 +1,326 @@
+#include <Geode/Geode.hpp>
+using namespace geode::prelude;
+
+#include <Geode/modify/LoadingLayer.hpp>
+class $modify(LoadingLayerExt, LoadingLayer) {
+	static void resourceSetup() {
+		auto resources_dir = getMod()->getResourcesDir();
+
+		auto tp = CCTexturePack();
+		tp.m_paths = { 
+			string::pathToString(resources_dir).c_str(), 
+			string::pathToString(resources_dir.parent_path()).c_str() //resources/../id
+		};
+		tp.m_id = "resources"_spr;
+		CCFileUtils::get()->addTexturePack(tp);
+
+		for (const auto& entry : std::filesystem::recursive_directory_iterator(resources_dir)) {
+			if (!entry.is_regular_file()) continue;
+
+			auto ext = entry.path().extension().string();
+			std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+			if (string::containsAny(ext, { ".png", ".jpg", ".jpeg", ".plist" })) {
+				auto relativePath = std::filesystem::relative(entry.path(), resources_dir);
+				CCSpriteFrameCache::get()->addSpriteFrame(
+					CCSprite::create(string::pathToString(relativePath).c_str())->displayFrame(),
+					string::pathToString(relativePath).c_str()
+				);
+			}
+		}
+
+		//happy
+		CCFileUtils::get()->m_fullPathCache["alphalaneous.happy_textures/bigFont.fnt"] = CCFileUtils::get()->fullPathForFilename(
+			"bigFont.fnt"_spr, 0
+		);
+		CCFileUtils::get()->m_fullPathCache["alphalaneous.happy_textures/bigFont.png"] = CCFileUtils::get()->fullPathForFilename(
+			"bigFont.png"_spr, 0
+		);
+	}
+	bool init(bool penis) {
+		resourceSetup();
+		if (!LoadingLayer::init(penis)) return false;
+
+		if (CCKeyboardDispatcher::get()->getControlKeyPressed()) return true;
+
+		if (1) findFirstChildRecursive<CCNode>(
+			this, [this](CCNode* node) {
+				if (node == this) return false;
+				node->setZOrder(-9999);
+				node->setVisible(0);
+				return false;
+			}
+		);
+
+		auto text = SimpleTextArea::create(
+			"hold on control to seen avoid the              ", "chatFont.fnt"
+		);
+		addChildAtPosition(text, Anchor::Center, { 0, 0 }, false);
+
+		this->runAction(CCRepeatForever::create(CCSequence::create(
+			CCShaky3D::create(0.01f, { 1, 1 }, 11, false),
+			CallFuncExt::create(
+				[__this = Ref(this), text = Ref(text)] {
+					if (__this->m_loadStep) text->setText(fmt::format(
+						"                   {}                 ", 
+						__this->m_loadStep
+					));
+
+					if (auto g = __this->m_pGrid) if (auto t = g->m_pTexture) t->setAliasTexParameters();
+				}
+			),
+			nullptr
+		)));
+
+		FMODAudioEngine::get()->setBackgroundMusicVolume(GameManager::get()->m_bgVolume);
+		FMODAudioEngine::get()->setEffectsVolume(GameManager::get()->m_sfxVolume);
+
+		GameManager::get()->fadeInMusic("loading.mp3");
+		
+		return true;
+	}
+};
+
+#include <Geode/modify/MenuLayer.hpp>
+class $modify(MenuLayerExt, MenuLayer) {
+	virtual void keyDown(cocos2d::enumKeyCodes p0) {
+		CCLayer::keyDown(p0);
+	};
+	bool init() {
+		if (!MenuLayer::init()) return false;
+
+		if (CCKeyboardDispatcher::get()->getControlKeyPressed()) return true;
+
+		if (1) findFirstChildRecursive<CCNode>(
+			this, [this](CCNode* node) {
+				if (node == this) return false;
+				node->setZOrder(-9999);
+				node->setVisible(0);
+				return false;
+			}
+		);
+
+		//dependencies test :D
+		if ([] {
+			for (auto dep : getMod()->getMetadataRef().getDependencies()) {
+				if (not Loader::get()->isModLoaded(dep.id)) return true;
+			}
+			return false;
+			}())
+		if (1) {
+
+			GameManager::get()->fadeInMusic("loading.wav"_spr);
+
+			auto menu = CCMenu::create();
+			menu->setID("dependencies_alert"_spr);
+			addChild(menu, 999, 54645);
+
+			auto stream = std::stringstream();
+			for (auto dep : getMod()->getMetadataRef().getDependencies()) {
+				stream << "- " << (Loader::get()->isModLoaded(dep.id) ? "\\[<cg>WAS LOADED</c>\\]" : "\\[<cr>NOT LOADED</c>\\]");
+				stream << fmt::format(": [{}](mod:{})", dep.id, dep.id) << std::endl;
+			}
+			//log::debug("{}", stream.str());
+			auto list = MDTextArea::create(stream.str(), this->getContentSize() * 0.65);
+			list->getScrollLayer()->m_cutContent = 0;
+			menu->addChildAtPosition(list, Anchor::Center, { 0, 0 });
+
+			auto title = SimpleTextArea::create("REQUIRED MODS WASN'T LOADED...", "bigFont.fnt", 0.9f)->getLines()[0];
+			title->setAnchorPoint({ 0.5f, 0.5f });
+			menu->addChildAtPosition(title, Anchor::Top, { 0, -28 });
+
+			auto restart = CCMenuItemExt::createSpriteExtra(
+				ButtonSprite::create(
+					"i sure these mods will be loaded. restart game", "bigFont.fnt", "GJ_button_04.png", 0.7f
+				),
+				[this](CCNode* ADs) { game::restart(); }
+			);
+			restart->getNormalImage()->setScale(0.7f);
+			menu->addChildAtPosition(restart, Anchor::Bottom, { 0, 36 });
+
+			return true;
+		};
+
+		auto static useful = 0;
+		if (!useful++) {
+			auto popup = createQuickPopup(
+				" \n                   oh hi there! \n \n                                ar u useful????",
+				"aaaaaaaaaaaaaaaaaaaaaaaaaaa", "no", "yes",
+				[](void*, bool yes) {
+					if (!yes) game::exit();
+					GameManager::get()->fadeInMusic("menuLoop.mp3");
+				}, !"show"
+			);
+			if (popup) if (auto g = popup->getGrid()) if (auto t = g->m_pTexture) t->setAliasTexParameters();
+			if (popup) if (auto a = popup->m_mainLayer->getChildByType<TextArea>(0)) a->setString(
+				" !*-the ceiling laughs. yes, it laughs. -\n"
+				" 2 are you me??? or am i you???\n"
+				"Sss Ss-1 stop...stop...the f ngers in the dark\n"
+				"aa a u.u.u.u.u.u.u. crying clocks 181 2\n"
+				"i see everything, nothing, something...?\n"
+				"3 - 9 ...and so it begins again... 6667\n"
+			);
+			if (auto a = popup->m_mainLayer->getChildByType<TextArea>(0)) a->setOpacity(12);
+			findFirstChildRecursive<CCNode>(popup->m_mainLayer,
+				[](CCNode* node) {
+					auto batched = typeinfo_cast<CCSpriteBatchNode*>(node->getParent());
+					auto label = typeinfo_cast<CCLabelProtocol*>(node->getParent());
+					if (batched and not label) return false;
+					auto dl = 5.0f;
+					auto dt = CCDelayTime::create(0.1f);
+					node->runAction(CCRepeatForever::create(CCSequence::create(
+						dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+						dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+						dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+						dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+						dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+						dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+						dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+						dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+						dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+						dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+						dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+						dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+						dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() * dl),
+						nullptr
+					)));
+					auto p = node->getPosition();
+					node->runAction(CCRepeatForever::create(CCSequence::create(
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() * dl, CCRANDOM_MINUS1_1() * dl)),
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() * dl, CCRANDOM_MINUS1_1() * dl)),
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+						dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() * dl, CCRANDOM_MINUS1_1() * dl)),
+						nullptr
+					)));
+					return false;
+				}
+			);
+			popup->m_noElasticity = this;
+			popup->m_scene = this;
+			popup->show();
+			popup->setOpacity(255);
+			GameManager::get()->fadeInMusic("hi.mp3");
+		}
+
+		CCFileUtils::get()->m_fullPathCache["GJ_gradientBG.png"] = CCFileUtils::get()->fullPathForFilename("menuBG_1.png", 0);
+		auto bg = geode::createLayerBG();
+		CCFileUtils::get()->m_fullPathCache.erase("GJ_gradientBG.png");
+		bg->setColor(ccWHITE);
+		addChild(bg);
+		auto bganim1 = CCSprite::create("menuBG_1.png");
+		auto bganim2 = CCSprite::create("menuBG_11.png");
+		this->runAction(CCRepeatForever::create(CCSequence::create(
+			CCDelayTime::create(1.0f),
+			CallFuncExt::create([bg = Ref(bg), anim = Ref(bganim2)] { bg->setDisplayFrame(anim->displayFrame()); }),
+			CCDelayTime::create(1.0f),
+			CallFuncExt::create([bg = Ref(bg), anim = Ref(bganim1)] { bg->setDisplayFrame(anim->displayFrame()); }),
+			nullptr
+		)));
+
+		CCFileUtils::get()->m_fullPathCache["GJ_gradientBG.png"] = CCFileUtils::get()->fullPathForFilename("flashes1.png", 0);
+		auto flashes = geode::createLayerBG();
+		CCFileUtils::get()->m_fullPathCache.erase("GJ_gradientBG.png");
+		flashes->setColor(ccWHITE);
+		addChild(flashes);
+		Ref flashes1 = CCSprite::create("flashes1.png");
+		Ref flashes2 = CCSprite::create("flashes2.png");
+		Ref flashes3 = CCSprite::create("flashes3.png");
+		std::vector<Ref<CCSprite>> flashes_list = { flashes1, flashes2, flashes3 };
+		flashes->runAction(CCRepeatForever::create(CCSequence::create(
+			CallFuncExt::create(
+				[flashes = Ref(flashes), flashes_list] {
+					if (auto g = flashes->m_pGrid) if (auto t = g->m_pTexture) t->setAliasTexParameters();
+					auto nextflash = flashes_list[rand() % flashes_list.size()];
+					flashes->setDisplayFrame(nextflash->displayFrame());
+					flashes->setVisible(true);
+				}
+			),
+			CCDelayTime::create(1.0f), CCHide::create(), CCDelayTime::create(15.0f), nullptr
+		)));
+
+		CCFileUtils::get()->m_fullPathCache["GJ_gradientBG.png"] = CCFileUtils::get()->fullPathForFilename("menuBG_2.png", 0);
+		auto menubg = geode::createLayerBG();
+		CCFileUtils::get()->m_fullPathCache.erase("GJ_gradientBG.png");
+		addChild(menubg);
+
+		auto menu = CCMenu::create();
+		menu->setID("menu"_spr);
+		addChild(menu);
+
+		menu->addChild(SimpleTextArea::create(getMod()->getMetadataRef().getName(), "bigFont.fnt", 1.2f)->getLines()[0]);
+
+		auto verl = SimpleTextArea::create(fmt::format(
+			"SDK {} on {}, Release {} (Dev, {})",
+			Mod::get()->getMetadataRef().getGeodeVersion().toVString(),
+			GEODE_PLATFORM_NAME,
+			Mod::get()->getVersion().toVString(),
+			std::filesystem::file_size(getMod()->getPackagePath())
+		).c_str(), "chatFont.fnt", 0.6f)->getLines()[0];
+		verl->setOpacity(63);
+		menu->addChild(verl);
+
+		menu->addChild(SimpleTextArea::create("             ", "bigFont.fnt", 1.5f)->getLines()[0]);
+
+		auto play = CCMenuItemExt::createSpriteExtra(
+			SimpleTextArea::create("play", "chatFont.fnt", 1.0f)->getLines()[0],
+			[__this = Ref(this)](CCNode* item) { __this->onPlay(item); }
+		);
+		menu->addChild(play);
+
+		auto geode = CCMenuItemExt::createSpriteExtra(
+			SimpleTextArea::create("geode", "chatFont.fnt", 1.0f)->getLines()[0],
+			[__this = Ref(this)](CCNode* item) { 
+				if (auto item = typeinfo_cast<CCMenuItem*>(__this->querySelector(
+					"geode.loader/geode-button"
+				))) item->activate();
+			}
+		);
+		menu->addChild(geode);
+
+		auto settings = CCMenuItemExt::createSpriteExtra(
+			SimpleTextArea::create("settings", "chatFont.fnt", 1.0f)->getLines()[0],
+			[__this = Ref(this)](CCNode* item) { __this->onOptions(item); }
+		);
+		menu->addChild(settings);
+
+		menu->setLayout(SimpleColumnLayout::create()->setGap(10.f)); 
+
+		findFirstChildRecursive<CCNode>(menu,
+			[](CCNode* node) {
+				auto dl = 1.0f;
+				auto dt = CCDelayTime::create(1.f);
+				node->runAction(CCRepeatForever::create(CCSequence::create(
+					dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+					dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+					dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+					dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+					dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
+					nullptr
+				)));
+				auto p = node->getPosition();
+				node->runAction(CCRepeatForever::create(CCSequence::create(
+					dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+					dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+					dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+					dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+					dt, CCMoveTo::create(0.f, p + CCPointMake(CCRANDOM_MINUS1_1() / dl, CCRANDOM_MINUS1_1() / dl)),
+					nullptr
+				)));
+				return false;
+			}
+		);
+
+		return true;
+	}
+};

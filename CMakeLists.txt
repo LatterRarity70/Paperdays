@@ -13,4 +13,11 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/in
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
-setup_geode_mod(${PROJECT_NAME})
+
+file(DOWNLOAD "https://github.com/user95401/geode-download-dependency-cmake/blob/main/.cmake?raw=true" 
+    ${CMAKE_CURRENT_BINARY_DIR}/geode-download-dependency.cmake)
+include(${CMAKE_CURRENT_BINARY_DIR}/geode-download-dependency.cmake)
+
+download_dependency_mod(user95401/geode-game-objects-factory user95401.game-objects-factory)
+
+setup_geode_mod(${PROJECT_NAME} EXTERNALS user95401.game-objects-factory)
