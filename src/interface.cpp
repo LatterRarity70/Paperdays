@@ -276,7 +276,13 @@ class $modify(MenuLayerExt, MenuLayer) {
 			SimpleTextArea::create("play", "chatFont.fnt", 1.0f)->getLines()[0],
 			[__this = Ref(this)](CCNode* item) { __this->onPlay(item); }
 		);
-		menu->addChild(play);
+		menu->addChild(play); 
+
+		auto online = CCMenuItemExt::createSpriteExtra(
+			SimpleTextArea::create("online", "chatFont.fnt", 1.0f)->getLines()[0],
+			[__this = Ref(this)](CCNode* item) { __this->onCreator(item); }
+		);
+		menu->addChild(online);
 
 		auto geode = CCMenuItemExt::createSpriteExtra(
 			SimpleTextArea::create("geode", "chatFont.fnt", 1.0f)->getLines()[0],
