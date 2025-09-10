@@ -1,5 +1,5 @@
 {
-	"geode": "4.7.0",
+	"geode": "4.8.0",
 	"early-load": true,
 	"gd": {
 		"win": "2.2074",
@@ -26,16 +26,16 @@
 	"resources": {
 		"fonts": {
 			"bigFont": {
-				"path": "assets/KislicinGraffiti.otf",
+				"path": "assets/_handwr.otf",
 				"size": 82
 			},
 			"goldFont": {
-				"path": "assets/KislicinGraffiti.otf",
-				"size": 74
+				"path": "assets/_handwr.otf",
+				"size": 72
 			},
 			"chatFont": {
-				"path": "assets/TravelingTypewriter.ttf",
-				"size": 58
+				"path": "assets/_text.otf",
+				"size": 42
 			},
 			"GhastlyPanicCyr": {
 				"path": "assets/GhastlyPanicCyr.otf",
@@ -49,8 +49,8 @@
 			"assets/sprites/**/*.png"
 		],
 		"spritesheets": {
-			"spritesheet": [
-				"assets/spritesheet/**/*.png"
+			"spritesheet1": [
+				"assets/frames/**/*.png"
 			]
 		}
 	}

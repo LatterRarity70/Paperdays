@@ -36,6 +36,13 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 		CCFileUtils::get()->m_fullPathCache["alphalaneous.happy_textures/bigFont.png"] = CCFileUtils::get()->fullPathForFilename(
 			"bigFont.png"_spr, 0
 		);
+
+		for (auto path : file::readDirectory(getMod()->getResourcesDir()).unwrapOrDefault()) {
+			auto str = string::pathToString(path);
+			auto name = string::pathToString(path.filename());
+			if (string::contains(str, "..")) CCFileUtils::get(
+			)->m_fullPathCache[string::replace(name, "..", "/")] = str.c_str();
+		}
 	}
 	bool init(bool penis) {
 		resourceSetup();
@@ -53,8 +60,9 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 		);
 
 		auto text = SimpleTextArea::create(
-			"hold on control to seen avoid the              ", "chatFont.fnt"
+			"hold on control\nto seen avoid the", "chatFont.fnt", 2.f
 		);
+		text->setAlignment(kCCTextAlignmentCenter);
 		addChildAtPosition(text, Anchor::Center, { 0, 0 }, false);
 
 		this->runAction(CCRepeatForever::create(CCSequence::create(
@@ -62,7 +70,7 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 			CallFuncExt::create(
 				[__this = Ref(this), text = Ref(text)] {
 					if (__this->m_loadStep) text->setText(fmt::format(
-						"                   {}                 ", 
+						"{}", 
 						__this->m_loadStep
 					));
 
@@ -144,8 +152,8 @@ class $modify(MenuLayerExt, MenuLayer) {
 		auto static useful = 0;
 		if (!useful++) {
 			auto popup = createQuickPopup(
-				" \n                   oh hi there! \n \n                                ar u useful????",
-				"aaaaaaaaaaaaaaaaaaaaaaaaaaa", "no", "yes",
+				" \n            oh hi there! \n \n                    ar u useful????",
+				"aaaaaaaaaaaaaaaaaaaaaaaaaaa\naaaaaaaaaa\naaaaaaaa", "no", "yes",
 				[](void*, bool yes) {
 					if (!yes) game::exit();
 					GameManager::get()->fadeInMusic("menuLoop.mp3");
@@ -323,4 +331,78 @@ class $modify(MenuLayerExt, MenuLayer) {
 
 		return true;
 	}
+};
+
+
+#include <Geode/modify/CCNode.hpp>
+class $modify(NodeVisitController, CCNode) {
+	auto replaceColors() {
+#define repl(org, tar) if (node->getColor() == org) node->setColor(tar);
+		if (Ref node = typeinfo_cast<CCNodeRGBA*>(this)) {
+			repl(ccc3(0, 102, 255), ccc3(255, 255, 255));
+			repl(ccc3(0, 75, 100), ccc3(255, 255, 255));
+			repl(ccc3(0, 56, 141), ccc3(22, 22, 22));
+			repl(ccc3(0, 39, 98), ccc3(17, 17, 17));
+			repl(ccc3(0, 46, 117), ccc3(14, 14, 14));
+			repl(ccc3(0, 36, 91), ccc3(10, 10, 10));
+			repl(ccc3(0, 31, 79), ccc3(10, 10, 10));
+			repl(ccc3(244, 212, 142), ccc3(92, 92, 92));
+			repl(ccc3(245, 174, 125), ccc3(255, 255, 255));
+			repl(ccc3(236, 137, 124), ccc3(92, 92, 92));
+			repl(ccc3(213, 105, 133), ccc3(255, 255, 255));
+			repl(ccc3(173, 84, 146), ccc3(92, 92, 92));
+			repl(ccc3(113, 74, 154), ccc3(255, 255, 255));
+		};
+		if (Ref node = typeinfo_cast<CCLayerColor*>(this)) {
+			repl(ccc3(191, 114, 62), ccc3(6, 6, 6));
+			repl(ccc3(161, 88, 44), ccc3(10, 10, 10));
+			repl(ccc3(194, 114, 62), ccc3(8, 8, 8));
+			//mod-list-frame
+			if (node->getColor() == ccc3(25, 17, 37)) node->setOpacity(0);// frame-bg
+			repl(ccc3(83, 65, 109), ccc3(17, 17, 17));//search-id
+			if (node->getColor() == ccc3(168, 85, 44)) node->setOpacity(0);// frame-bg gd
+			repl(ccc3(114, 63, 31), ccc3(17, 17, 17));//search-id gd
+		};
+#undef repl
+	}
+	$override void visit() {
+		CCNode::visit();
+		if (Ref node = typeinfo_cast<GJListLayer*>(this)) {
+			if (node->getOpacity() == 180) node->setOpacity(255);// list-bg
+		}
+		if (Ref<SetupTriggerPopup> a = typeinfo_cast<UIOptionsLayer*>(this); a = a ? a : typeinfo_cast<UIPOptionsLayer*>(this)) {
+			a->setOpacity(160);
+			a->setColor(ccBLACK);
+		}
+		if (GameManager::get()->m_gameLayer and Ref(GameManager::get()->m_gameLayer)->isRunning()) void();
+		else {
+			Ref(this)->replaceColors();
+		}
+	}
+};
+
+#include <Geode/modify/CCSpriteFrameCache.hpp>
+class $modify(CCSpriteFrameCacheExt, CCSpriteFrameCache) {
+	CCSpriteFrame* spriteFrameByName(const char* pszName) {
+		std::string name = pszName;
+		// chains that not in game.
+		if (GameManager::get()->m_gameLayer and GameManager::get()->m_gameLayer->isRunning()) void();
+		else if (string::contains(name, "chain_01")) {
+			name = "emptyFrame.png";
+		}
+		// sprites at this mod id (id.asd/pszName ? rtn(id.asd/pszName))
+		{
+			auto frameAtSprExtName = (Mod::get()->getID() + "/" + name);
+			auto test = CCSpriteFrameCache::get()->m_pSpriteFrames->objectForKey(frameAtSprExtName.c_str());
+			name = test ? frameAtSprExtName.c_str() : name.c_str();
+			if (test) CCSpriteFrameCache::get()->m_pSpriteFrames->setObject(test, pszName);
+		};
+		//subs? (aka "geode.loader/penis.png")
+		if (name.find("/") != std::string::npos) {
+			auto test_name = Mod::get()->getID() + "/" + string::replace(name, "/", "..");
+			auto test = CCSpriteFrameCache::get()->m_pSpriteFrames->objectForKey(test_name);
+			name = test ? test_name.data() : name.c_str();
+		}
+		return CCSpriteFrameCache::spriteFrameByName(name.c_str());
+	};
 };

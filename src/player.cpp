@@ -1,17 +1,43 @@
 #include <Geode/Geode.hpp>
 using namespace geode::prelude;
 
+#include <Geode/modify/GJBaseGameLayer.hpp>
+class $modify(GJBaseGameLayerEventsExt, GJBaseGameLayer) {
+	void gameEventTriggered(GJGameEvent p0, int p1, int p2) {
+		auto eventID = static_cast<int>(p0);
+		auto audio = FMODAudioEngine::get();
+		for (auto player : { m_player1, m_player2 }) if (player) {
+			if ((eventID == 71 or eventID == 73) and player->m_isOnGround) audio->playEffect("step_jump.ogg", 1.f, 1.f, 0.5f);
+			if (eventID >= 2 and eventID <= 5) {//landing
+				if (player->m_isRobot) audio->playEffect("step_landing.ogg", 1.f, 1.f / eventID, 0.9f + (eventID / 10));
+			}
+			if (eventID >= 12 and eventID <= 13) {//jump
+				if (player->m_isRobot) {
+					if (!player->getActionByTag(5718932)) {
+						auto jump_anim = CCSequence::create(
+							CCEaseBackOut::create(CCScaleTo::create(
+								0.1f, player->getScaleX() - 0.15f, player->getScaleY() + 0.15f
+							)),
+							CCEaseSineOut::create(CCScaleTo::create(
+								0.15f, player->getScale(), player->getScaleX()
+							)),
+							nullptr
+						);
+						jump_anim->setTag(5718932);
+						player->runAction(jump_anim);
+					};
+					audio->playEffect("step_jump.ogg", 1.f, 1.f, 1.f);
+				}
+			}
+		}
+		GJBaseGameLayer::gameEventTriggered(p0, p1, p2);
+	};
+};
+
 #include <Geode/modify/PlayerObject.hpp>
 class $modify(PlayerObjectExt, PlayerObject) {
-	struct Fields : DialogDelegate {
+	struct Fields {
 		PlayerObject* self;
-		DialogLayer* dialogLayer = nullptr;
-		virtual void dialogClosed(DialogLayer* p0) {
-			self->m_controlsDisabled = (true);
-			self->enablePlayerControls();
-			self->releaseAllButtons();
-			dialogLayer = nullptr;
-		};
 		float m_lastPlatformerXVelocity = 0.1;
 	};
 	bool init(int p0, int p1, GJBaseGameLayer* p2, cocos2d::CCLayer* p3, bool p4) {
@@ -28,10 +54,10 @@ class $modify(PlayerObjectExt, PlayerObject) {
 
 		
 		//add animations
-#define add(name, amount, speed)																								\
+#define anim(name, amount, speed)																								\
 		auto name = CCSprite::createWithSpriteFrameName(#name"1.png"_spr);																			\
 		if (name) {																												\
-			name->setID(#name""_spr);																							\
+			name->setID(#name##_spr);																							\
 			this->addChild(name);																								\
 			auto frames = CCArray::create();																					\
 			for (int i = 1; i <= amount; i++) if (auto sprite = CCSprite::createWithSpriteFrameName(												\
@@ -40,14 +66,17 @@ class $modify(PlayerObjectExt, PlayerObject) {
 			else log::warn("there is no {}/"#name"{}.png", GEODE_MOD_ID, i);													\
 			name->runAction(CCRepeatForever::create(CCAnimate::create(CCAnimation::createWithSpriteFrames(frames, speed))));	\
 		};
-		add(side_susie_idle, 2, 0.5f);
-		add(side_susie_run, 10, 0.05f);
-		add(side_susie_fallingdown, 2, 0.05f);
-		add(side_susie_flyingup, 2, 0.05f);
+
+		anim(side_susie_idle, 2, 0.5f);
+		anim(side_susie_fallingdown, 2, 0.1f);
+		anim(side_susie_flyingup, 2, 0.1f);
+		anim(side_susie_run, 9, 0.0666f);
 
 		return true;
 	}
-	virtual void update(float p0) {
+	void update(float p0) {
+
+		if (this->m_gameLayer != GameManager::get()->m_gameLayer) return PlayerObject::update(p0);
 
 		m_fields->m_lastPlatformerXVelocity =
 			fabs(this->m_platformerXVelocity) > 0.001f ?
@@ -56,13 +85,14 @@ class $modify(PlayerObjectExt, PlayerObject) {
 		m_yVelocity = m_isUpsideDown ? -m_yVelocity : m_yVelocity;
 
 		CCSize size = { 15.000f, 30.000f };
+		CCSize def_size = { 30.000f, 30.000f };
 		this->m_obContentSize = size;
 		this->m_objectRect.size = size;
 		this->m_width = size.width;
 		this->m_height = size.height;
 
 #define in_range(tar, from, to) (tar >= from and tar <= to)
-		bool showAnimPlr = (this->m_isRobot) and !this->m_isDead;
+		bool showAnimPlr = (this->m_isRobot);
 		bool isOnAir = !this->m_isOnGround or !in_range(m_yVelocity, -5.2f, 5.2f);
 		bool isStanding = fabs(this->m_platformerXVelocity) < 0.25f;
 
@@ -106,6 +136,32 @@ class $modify(PlayerObjectExt, PlayerObject) {
 					p->setScaleX(mainLayer->getScaleX());
 					p->setScaleY(mainLayer->getScaleY());
 				};
+
+				CCSpriteFrame* lastFrame = typeinfo_cast<CCSpriteFrame*>(this->getUserObject("anim-last-frame"_spr));
+				if (!lastFrame) {
+					lastFrame = visible_sprite->displayFrame();
+					this->setUserObject("anim-last-frame"_spr, lastFrame);
+				}
+				if (not visible_sprite->displayFrame()->getRect().equals(lastFrame->getRect())) {
+					lastFrame = visible_sprite->displayFrame();
+					this->setUserObject("anim-last-frame"_spr, lastFrame);
+
+					bool isMovingOnGround = this->m_isOnGround and std::fabs(this->m_platformerXVelocity) > 0.1f;
+					if (isMovingOnGround and spr_player_run->getAnchorPoint().equals(showp)) {
+						bool isStepFrame = false;
+						auto frameCache = CCSpriteFrameCache::get();
+						auto lfr = lastFrame->getRect();
+						isStepFrame = lfr.equals(frameCache->spriteFrameByName("side_susie_run4.png"_spr)->getRect()) ? true : isStepFrame;
+						isStepFrame = lfr.equals(frameCache->spriteFrameByName("side_susie_run9.png"_spr)->getRect()) ? true : isStepFrame;
+						if (isStepFrame) {
+							// Play step sound only on frame transition
+							std::vector<std::string> stepSounds = { "step_a.ogg", "step_b.ogg" };
+							std::string selectedSound = stepSounds[rand() % stepSounds.size()];
+							FMODAudioEngine::get()->playEffect(selectedSound, 1.0f, 1.0f, 5.0f);
+						};
+					};
+
+				}
 			};
 
 			this->m_robotBurstParticles->setVisible(0);
