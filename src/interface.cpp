@@ -40,8 +40,10 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 		for (auto path : file::readDirectory(getMod()->getResourcesDir()).unwrapOrDefault()) {
 			auto str = string::pathToString(path);
 			auto name = string::pathToString(path.filename());
-			if (string::contains(str, "..")) CCFileUtils::get(
-			)->m_fullPathCache[string::replace(name, "..", "/")] = str.c_str();
+			auto nsub = string::replace(name, "..", "/");
+			if (string::contains(str, "..")) CCFileUtils::get()->m_fullPathCache[nsub] = CCFileUtils::get()->fullPathForFilename(
+				name.c_str(), 0
+			);
 		}
 	}
 	bool init(bool penis) {
