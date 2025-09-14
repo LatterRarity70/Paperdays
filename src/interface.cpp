@@ -1,6 +1,12 @@
 #include <Geode/Geode.hpp>
 using namespace geode::prelude;
 
+void disableIMEInpMod() {
+	auto mod = Loader::get()->getInstalledMod("alk.ime-input");
+	if (mod) for (auto hook : mod->getHooks()) if (hook) hook->disable();
+}
+$on_mod(Loaded) { disableIMEInpMod(); }
+
 #include <Geode/modify/LoadingLayer.hpp>
 class $modify(LoadingLayerExt, LoadingLayer) {
 	static void resourceSetup() {
@@ -335,7 +341,6 @@ class $modify(MenuLayerExt, MenuLayer) {
 	}
 };
 
-
 #include <Geode/modify/CCNode.hpp>
 class $modify(NodeVisitController, CCNode) {
 	auto replaceColors() {
@@ -369,6 +374,7 @@ class $modify(NodeVisitController, CCNode) {
 	}
 	$override void visit() {
 		CCNode::visit();
+		if (CCKeyboardDispatcher::get()->getControlKeyPressed()) return;
 		if (Ref node = typeinfo_cast<GJListLayer*>(this)) {
 			if (node->getOpacity() == 180) node->setOpacity(255);// list-bg
 		}
@@ -386,6 +392,9 @@ class $modify(NodeVisitController, CCNode) {
 #include <Geode/modify/CCSpriteFrameCache.hpp>
 class $modify(CCSpriteFrameCacheExt, CCSpriteFrameCache) {
 	CCSpriteFrame* spriteFrameByName(const char* pszName) {
+		if (CCKeyboardDispatcher::get()->getControlKeyPressed()) return CCSpriteFrameCache::spriteFrameByName(
+			pszName
+		);
 		std::string name = pszName;
 		// chains that not in game.
 		if (GameManager::get()->m_gameLayer and GameManager::get()->m_gameLayer->isRunning()) void();
@@ -406,5 +415,38 @@ class $modify(CCSpriteFrameCacheExt, CCSpriteFrameCache) {
 			name = test ? test_name.data() : name.c_str();
 		}
 		return CCSpriteFrameCache::spriteFrameByName(name.c_str());
+	};
+};
+
+#include <user95401.main-levels-editor/include/level.hpp>
+#include <Geode/modify//////////////LevelSelectLayer.hpp>
+class $modify(LevelSelectLayerExt, LevelSelectLayer) {
+	static cocos2d::CCScene* scene(int p0) {
+		if (CCKeyboardDispatcher::get()->getControlKeyPressed()) return LevelSelectLayer::scene(p0);
+		auto level = getMod()->getSavedValue("level", 0);
+		auto name = ("properdies_" + utils::numToString(level) + ".level");
+		auto path = string::pathToString(CCFileUtils::get()->fullPathForFilename(name.c_str(), 0).c_str());
+		auto devmode = string::pathToString(
+			CMAKE_CURRENT_SOURCE_DIR "/assets/files/levels/" + name
+		);
+		if (fileExistsInSearchPaths(devmode.c_str())) { 
+			Notification::create(" Level loaded from source folder :D\n " + devmode, NotificationIcon::Info, 3.f)->show();
+			path = devmode; 
+		}
+		auto import = level::importLevelFile(path);
+		if (import.isOk()) {
+			auto xd = PlayLayer::scene(import.unwrapOrDefault(), 0, 0);
+			return xd;
+		}
+		else {
+			Notification::create(
+				" Failed to import:\n " + path, NotificationIcon::Error, 3.f
+			)->show();
+			if (import.err()) Notification::create(
+				import.err().value_or("unk err .-."), 
+				NotificationIcon::Error, 3.f
+			)->show();
+			return LevelSelectLayer::scene(p0);
+		}
 	};
 };

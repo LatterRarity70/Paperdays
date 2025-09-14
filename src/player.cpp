@@ -6,25 +6,25 @@ class $modify(GJBaseGameLayerEventsExt, GJBaseGameLayer) {
 	void gameEventTriggered(GJGameEvent p0, int p1, int p2) {
 		auto eventID = static_cast<int>(p0);
 		auto audio = FMODAudioEngine::get();
-		for (auto player : { m_player1, m_player2 }) if (player) {
-			if ((eventID == 71 or eventID == 73) and player->m_isOnGround) audio->playEffect("step_jump.ogg", 1.f, 1.f, 0.5f);
+		for (auto p : { m_player1, m_player2 }) if (p and not p->m_isHidden) {
+			if ((eventID == 71 or eventID == 73) and p->m_isOnGround and p->m_isRobot) audio->playEffect("step_jump.ogg", 1.f, 1.f, 0.5f);
 			if (eventID >= 2 and eventID <= 5) {//landing
-				if (player->m_isRobot) audio->playEffect("step_landing.ogg", 1.f, 1.f / eventID, 0.9f + (eventID / 10));
+				if (p->m_isRobot) audio->playEffect("step_landing.ogg", 1.f, 1.f / eventID, 0.9f + (eventID / 10));
 			}
 			if (eventID >= 12 and eventID <= 13) {//jump
-				if (player->m_isRobot) {
-					if (!player->getActionByTag(5718932)) {
+				if (p->m_isRobot) {
+					if (!p->getActionByTag(5718932)) {
 						auto jump_anim = CCSequence::create(
 							CCEaseBackOut::create(CCScaleTo::create(
-								0.1f, player->getScaleX() - 0.15f, player->getScaleY() + 0.15f
+								0.1f, p->getScaleX() - 0.15f, p->getScaleY() + 0.15f
 							)),
 							CCEaseSineOut::create(CCScaleTo::create(
-								0.15f, player->getScale(), player->getScaleX()
+								0.15f, p->getScale(), p->getScaleX()
 							)),
 							nullptr
 						);
 						jump_anim->setTag(5718932);
-						player->runAction(jump_anim);
+						p->runAction(jump_anim);
 					};
 					audio->playEffect("step_jump.ogg", 1.f, 1.f, 1.f);
 				}
@@ -43,6 +43,9 @@ class $modify(PlayerObjectExt, PlayerObject) {
 	bool init(int p0, int p1, GJBaseGameLayer* p2, cocos2d::CCLayer* p3, bool p4) {
 		if (!PlayerObject::init(p0, p1, p2, p3, p4)) return false;
 		m_fields->self = this;
+
+		if (!this->m_gameLayer) return true;
+		if (this->m_gameLayer != GameManager::get()->m_gameLayer) return true;
 
 		//particle effects
 		auto drag = "11a-1a0.68a1.27a-1a90a45a0a20a5a1a0a0a0a0a0a0a30a5a0a0a0.247059a0a0.243137a0a0.243137a0a0.352941a0a11a19a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a1a1a0a1a1a182a0a0a0a0a0a0a0a0a0a0a0a0a0a0";
