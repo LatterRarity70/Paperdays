@@ -423,8 +423,7 @@ class $modify(CCSpriteFrameCacheExt, CCSpriteFrameCache) {
 class $modify(LevelSelectLayerExt, LevelSelectLayer) {
 	static cocos2d::CCScene* scene(int p0) {
 		if (CCKeyboardDispatcher::get()->getControlKeyPressed()) return LevelSelectLayer::scene(p0);
-		/*
-	auto level = getMod()->getSavedValue("level", 0);
+		auto level = getMod()->getSavedValue("level", 0);
 		auto name = ("properdies_" + utils::numToString(level) + ".level");
 		auto path = string::pathToString(CCFileUtils::get()->fullPathForFilename(name.c_str(), 0).c_str());
 		auto devmode = string::pathToString(
@@ -436,10 +435,9 @@ class $modify(LevelSelectLayerExt, LevelSelectLayer) {
 		}
 		auto import = level::importLevelFile(path);
 		if (import.isOk()) {
-			*/
-			auto xd = PlayLayer::scene(/*import.unwrapOrDefault()*/GJGameLevel::create(), 0, 0);
+			auto xd = PlayLayer::scene(import.unwrapOrDefault(), 0, 0);
 			return xd;
-		/*}
+		}
 		else {
 			Notification::create(
 				" Failed to import:\n " + path, NotificationIcon::Error, 3.f
@@ -449,6 +447,6 @@ class $modify(LevelSelectLayerExt, LevelSelectLayer) {
 				NotificationIcon::Error, 3.f
 			)->show();
 			return LevelSelectLayer::scene(p0);
-		}*/
+		}
 	};
 };
