@@ -21,6 +21,8 @@ include(${CMAKE_CURRENT_BINARY_DIR}/geode-download-dependency.cmake)
 download_dependency_mod(LatterRarity70/geode-game-objects-factory user95401.game-objects-factory FALSE)
 download_dependency_mod(LatterRarity70/Main-Levels-Editor user95401.main-levels-editor FALSE)
 
+target_include_directories(${PROJECT_NAME} PUBLIC "${GEODE_DEPS_DIR}")
+
 setup_geode_mod(${PROJECT_NAME})
 
 target_compile_definitions(${PROJECT_NAME} PUBLIC CMAKE_CURRENT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
