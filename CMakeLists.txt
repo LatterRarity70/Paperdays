@@ -18,8 +18,8 @@ file(DOWNLOAD "https://github.com/LatterRarity70/geode-download-dependency-cmake
     ${CMAKE_CURRENT_BINARY_DIR}/geode-download-dependency.cmake)
 include(${CMAKE_CURRENT_BINARY_DIR}/geode-download-dependency.cmake)
 
-download_dependency_mod(LatterRarity70/geode-game-objects-factory user95401.game-objects-factory)
-download_dependency_mod(LatterRarity70/Main-Levels-Editor user95401.main-levels-editor)
+download_dependency_mod(LatterRarity70/geode-game-objects-factory user95401.game-objects-factory FALSE)
+download_dependency_mod(LatterRarity70/Main-Levels-Editor user95401.main-levels-editor FALSE)
 
 setup_geode_mod(${PROJECT_NAME})
 
