@@ -152,11 +152,147 @@ inline void SetupObjects() {
 			return false;
 		}
 	);
-	plrinputtrigger->spawnObject([](GJBaseGameLayer* a, GameObject*aaa , double, gd::vector<int> const& aa) {
-		plrinputtrigger->m_triggerObject((EffectGameObject*)aaa, GameManager::get()->getGameLayer(), 0, nullptr);
-		});
 	plrinputtrigger->registerMe();
 
+	static GameObjectsFactory::GameObjectConfig* svcondtrigger = GameObjectsFactory::createTriggerConfig(
+		UNIQ_ID("pd-sv-cond-toggle"), "edit_eItemCompBtn_001.png",
+		[](EffectGameObject* object, GJBaseGameLayer* game, int p0, gd::vector<int> const* p1) {
+			if (!object) return;
+			if (!game) return;
+
+			//set:key:value (setups value)
+			auto data = typeinfo_cast<CCNode*>(object->getUserObject("data"_spr));
+			if (!data) return log::error("data == {}", data);
+			auto split = string::split(data->getID(), ":");
+			if (split.size() == 3 and split[0] == "set") {
+				getMod()->getSaveContainer()[split[1]] = matjson::parse(split[2]).unwrapOrDefault();
+			}
+
+			object->m_objectID = svcondtrigger->m_refObjectID;
+			object->triggerObject(game, p0, p1);
+			object->m_objectID = svcondtrigger->m_objectID;
+		}
+	)->refID(1049)->insertIndex(7)->onEditObject(
+		[](EditorUI* a, GameObject* aa) -> bool {
+			if (!a) return false;
+			if (!aa) return false;
+			queueInMainThread(
+				[a = Ref(a), aa = Ref(aa)] {
+					if (!CCScene::get()) return log::error("CCScene::get() == {}", CCScene::get());
+					auto popup = CCScene::get()->getChildByType<SetupObjectTogglePopup>(0);
+					if (!popup) return log::error("popup == {}", popup);
+					auto object = typeinfo_cast<EffectGameObject*>(aa.data());
+					if (!object) return log::error("object == {} ({})", object, aa);
+					auto data = typeinfo_cast<CCNode*>(object->getUserObject("data"_spr));
+					if (!data) return log::error("data == {}", data);
+
+					if (popup->getUserObject("got-custom-setup-for-sv-cond-toggle")) return;
+					popup->setUserObject("got-custom-setup-for-sv-cond-toggle", aa);
+
+					auto main = popup->m_mainLayer;
+					auto menu = popup->m_buttonMenu;
+
+					if (auto aaa = main->getChildByType<CCLabelBMFont>(0)) aaa->setString(" \nSave Value Based\n   Toggle Group");
+
+					if (auto aaa = main->getChildByType<CCLabelBMFont>(-1)) aaa->setVisible(false);
+					if (auto aaa = menu->getChildByType<CCMenuItem>(-1)) aaa->setVisible(false);
+
+					auto input = TextInput::create(228.700f, "asd:=true (key:[!][=,<,>,*][value])\nset:key:value (setups value)", "chatFont.fnt");
+					input->setFilter(" !\"#$ * &'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+					input->getInputNode()->m_allowedChars = " !\"#$ * &'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+					if (!data->getID().empty()) input->setString(data->getID());
+					input->setPositionY(76.000);
+					input->setCallback(
+						[data = Ref(data)](const std::string& p0) {
+							data->setID(p0);
+						}
+					);
+					popup->m_buttonMenu->addChild(input);
+				}
+			);
+			return false;
+		}
+	)->customSetup(
+		[](GameObject* object)
+		{
+			if (!object) return object;
+			Ref<CCRepeatForever> action;
+			action = CCRepeatForever::create(CCSequence::create(CallFuncExt::create(
+				[__this = Ref(object), action] {
+					Ref object = typeinfo_cast<EffectGameObject*>(__this.data());
+					if (!object) return GameManager::get()->stopAction(action);
+					Ref data = typeinfo_cast<CCNode*>(object->getUserObject("data"_spr));
+					if (!data) return GameManager::get()->stopAction(action);
+					//data str
+					auto str = data->getID();
+					//update basic stuff
+					if (Ref sub = object->getChildByType<CCSprite>(0)) {
+						sub->setZOrder(1);
+						sub->setScale(0.675f);
+						sub->setPositionY(25.5f);
+						sub->setPositionX(object->getContentSize().width / 2.f);
+						sub->setColor(object->m_activateGroup ?
+							cc3bFromHexString("#00FF28").unwrapOrDefault()
+							: cc3bFromHexString("#FF0049").unwrapOrDefault()
+						);
+						if (string::contains(str, "set:")) sub->setColor(
+							cc3bFromHexString("#0066FF").unwrapOrDefault()
+						);
+					}
+					//"asd:=true (key:[!][=,<,>,*][value])"
+					if (str.empty()) return;
+					auto split = string::split(str, ":");
+					if (split.size() != 2) return;
+					if (split[0].empty()) return void(); // log::error("split[0].empty()");
+					if (split[1].empty()) return void(); // log::error("split[1].empty()");
+					;;;; std::string key = split[0];
+					;; std::string cond = &split[1].at(0);
+					matjson::Value value = matjson::parse(split[1].substr(1)).unwrapOrDefault();
+					if (key.empty() or cond.empty()) return void(); // log::error("key == {}, cond == {}", key, cond);
+					//log::debug("key == {}, cond == {}, value == {}", key, cond, value.dump());
+					auto sv = getMod()->getSaveContainer()[key];
+					//log::debug("sv == {}", sv.dump());
+					auto inv = string::contains(cond, "!");
+					auto& v = object->m_activateGroup;
+					namespace s = string;
+					if (s::contains(cond, "=")) v = (sv == value) - inv;
+					if (s::contains(cond, "<")) v = (sv < value) - inv;
+					if (s::contains(cond, ">")) v = (sv > value) - inv;
+					if (s::contains(cond, "*")) v = s::contains(sv.dump(), value.dump()) - inv;
+				}), nullptr
+			));
+			if (Ref a = GameManager::get()->m_gameLayer) a->runAction(action);
+			object->setUserObject("data"_spr, CCNode::create());
+			return object;
+		}
+	)->saveString(
+		[](std::string str, GameObject* object, GJBaseGameLayer* level)
+		{
+			if (!object) return gd::string(str.c_str());
+			if (!level) return gd::string(str.c_str());
+			object->m_objectID = svcondtrigger->m_refObjectID;
+			str = string::replace(
+				object->getSaveString(level).c_str(),
+				fmt::format("{},", svcondtrigger->m_refObjectID).c_str(),
+				fmt::format("{},", svcondtrigger->m_objectID).c_str()
+			).c_str();
+			object->m_objectID = svcondtrigger->m_objectID;
+			if (auto data = typeinfo_cast<CCNode*>(object->getUserObject("data"_spr))) {
+				str += ",228,";
+				str += ZipUtils::base64URLEncode(data->getID().c_str()).c_str();
+			}
+			return gd::string(str.c_str());
+		}
+	)->objectFromVector(
+		[](GameObject* object, gd::vector<gd::string>& p0, gd::vector<void*>&, void*, bool)
+		{
+			if (!object) return object;
+			auto data = typeinfo_cast<CCNode*>(object->getUserObject("data"_spr));
+			if (data) data->setID(ZipUtils::base64URLDecode(p0[228].c_str()).c_str());
+			return object;
+		}
+	);
+	svcondtrigger->registerMe();
 
 	class DialogTriggerDelegate : public DialogDelegate {
 	public:
@@ -181,6 +317,8 @@ inline void SetupObjects() {
 		"edit_eEventLinkBtn_001.png",
 		[](EffectGameObject* trigger, GJBaseGameLayer* game, int p1, gd::vector<int> const* p2)
 		{
+			if (!trigger) return;
+			if (!game) return;
 			if (auto DialogTriggerDataNode = typeinfo_cast<CCNode*>(trigger->getUserObject("data"_spr))) {
 				sharedDialogTriggerDelegate->m_game = game;
 				auto raw_data = "[" + DialogTriggerDataNode->getID() + "]";
@@ -198,6 +336,7 @@ inline void SetupObjects() {
 
 				DialogChatPlacement placement = DialogChatPlacement::Center;
 
+				auto hide = false;
 				auto no_pause = false;
 				auto not_skippable = true;
 				auto character = std::string("");
@@ -244,6 +383,10 @@ inline void SetupObjects() {
 							no_pause = true;
 							continue;
 						}
+						if (string::startsWith(text, "!hide")) {
+							hide = true;
+							continue;
+						}
 						if (string::startsWith(text, "!plr_speed:")) {
 							auto speed = utils::numFromString<float>(string::replace(text, "!plr_speed:", "")).unwrapOrDefault();
 							std::vector<Ref<PlayerObject>> ps = { game->m_player1, game->m_player2 };
@@ -266,8 +409,8 @@ inline void SetupObjects() {
 
 				if (false) log::debug("placement {}", static_cast<int>(placement));
 
+				auto& dialog = sharedDialogTriggerDelegate->m_dialogLayer;
 				if (dialogObjectsArr.size()) {
-					auto& dialog = sharedDialogTriggerDelegate->m_dialogLayer;
 					if (dialog) dialog->removeFromParent();
 					dialog = DialogLayer::createDialogLayer(
 						dialogObjectsArr[0], dialogObjectsArr.inner(), 1
@@ -293,10 +436,14 @@ inline void SetupObjects() {
 						game->pauseSchedulerAndActions();
 					}
 				}
+				if (dialog and hide) dialog->removeFromParent();
 			}
 		},
 		[](EditTriggersPopup* popup, EffectGameObject* trigger, CCArray* objects)
 		{
+			if (!popup) return;
+			if (!trigger) return;
+			if (!objects) return;
 			if (auto data = typeinfo_cast<CCNode*>(trigger->getUserObject("data"_spr))) {
 				if (auto title = popup->getChildByType<CCLabelBMFont*>(0)) {
 					title->setString("");
@@ -310,8 +457,8 @@ inline void SetupObjects() {
 				}
 
 				auto input = TextInput::create(422.f, "Dialog data string...", "chatFont.fnt");
-				input->setFilter(" !\"#$ % &'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
-				input->getInputNode()->m_allowedChars = " !\"#$ % &'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+				input->setFilter(" !\"#$ * &'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+				input->getInputNode()->m_allowedChars = " !\"#$ * &'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
 				input->getInputNode()->m_textLabel->setWidth(input->getContentWidth() - 28.f);
 				input->setString(data->getID());
 				input->setPositionY(174.000f);
@@ -349,6 +496,7 @@ inline void SetupObjects() {
 	)->customSetup(
 		[](GameObject* object)
 		{
+			if (!object) return object;
 			auto data = CCNode::create();
 			object->setUserObject("data"_spr, data);
 			object->m_objectType = GameObjectType::CustomRing;
@@ -359,6 +507,8 @@ inline void SetupObjects() {
 	)->saveString(
 		[](std::string str, GameObject* object, GJBaseGameLayer* level)
 		{
+			if (!object) return gd::string(str.c_str());
+			if (!level) return gd::string(str.c_str());
 			if (auto data = typeinfo_cast<CCNode*>(object->getUserObject("data"_spr))) {
 				str += ",228,";
 				str += ZipUtils::base64URLEncode(data->getID().c_str()).c_str();

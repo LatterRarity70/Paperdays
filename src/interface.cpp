@@ -1,6 +1,10 @@
 #include <Geode/Geode.hpp>
 using namespace geode::prelude;
 
+#define saves getMod()->getSaveContainer
+
+#include <user95401.main-levels-editor/include/level.hpp>
+
 void disableIMEInpMod() {
 	auto mod = Loader::get()->getInstalledMod("alk.ime-input");
 	if (mod) for (auto hook : mod->getHooks()) if (hook) hook->disable();
@@ -102,6 +106,42 @@ class $modify(MenuLayerExt, MenuLayer) {
 	virtual void keyDown(cocos2d::enumKeyCodes p0) {
 		CCLayer::keyDown(p0);
 	};
+	static cocos2d::CCScene* scene(bool isVideoOptionsOpen) {
+		static auto killgame = false;
+		if (killgame) {
+			getMod()->saveData();
+			game::exit();
+		}
+		auto ragebaited = saves()["ragebaited"].asInt().unwrapOr(0);
+		auto ragebait_answered = saves()["ragebait_answered"].asBool().unwrapOr(false);
+		if (ragebaited and !ragebait_answered) {
+			auto name = std::string("properdies_ragebaited.level");
+			auto path = string::pathToString(CCFileUtils::get()->fullPathForFilename(name.c_str(), 0).c_str());
+			auto devmode = string::pathToString(
+				CMAKE_CURRENT_SOURCE_DIR "/assets/files/levels/" + name
+			);
+			if (fileExistsInSearchPaths(devmode.c_str())) {
+				Notification::create(" Level loaded from source folder :D\n " + devmode, NotificationIcon::Info, 3.f)->show();
+				path = devmode;
+			}
+			auto import = level::importLevelFile(path);
+			if (import.isOk()) {
+				killgame = true;
+				auto xd = PlayLayer::scene(import.unwrapOrDefault(), 0, 0);
+				return xd;
+			}
+			else {
+				Notification::create(
+					" Failed to import:\n " + path, NotificationIcon::Error, 3.f
+				)->show();
+				if (import.err()) Notification::create(
+					import.err().value_or("unk err .-."), 
+					NotificationIcon::Error, 3.f
+				)->show();
+			}
+		}
+		return MenuLayer::scene(isVideoOptionsOpen);
+	};
 	bool init() {
 		if (!MenuLayer::init()) return false;
 
@@ -163,18 +203,27 @@ class $modify(MenuLayerExt, MenuLayer) {
 				" \n            oh hi there! \n \n                    ar u useful????",
 				"aaaaaaaaaaaaaaaaaaaaaaaaaaa\naaaaaaaaaa\naaaaaaaa", "no", "yes",
 				[](void*, bool yes) {
-					if (!yes) game::exit();
+					if (!yes) {
+						if (saves()["useful-confirmed"].asBool().unwrapOr(false)) {
+							saves()["ragebaited"] = saves()["ragebaited"].asInt().unwrapOr(0) + 1;
+							saves()["ragebait_answered"] = false;
+							getMod()->saveData();
+						};
+						game::exit();
+					}
 					GameManager::get()->fadeInMusic("menuLoop.mp3");
+					saves()["useful-confirmed"] = true;
+					getMod()->saveData();
 				}, !"show"
 			);
 			if (popup) if (auto g = popup->getGrid()) if (auto t = g->m_pTexture) t->setAliasTexParameters();
 			if (popup) if (auto a = popup->m_mainLayer->getChildByType<TextArea>(0)) a->setString(
-				" !*-the ceiling laughs. yes, it laughs. -\n"
+				" !*-the ceiling laughs. ya, it laughs. -\n"
 				" 2 are you me??? or am i you???\n"
-				"Sss Ss-1 stop...stop...the f ngers in the dark\n"
-				"aa a u.u.u.u.u.u.u. crying clocks 181 2\n"
-				"i see everything, nothing, something...?\n"
-				"3 - 9 ...and so it begins again... 6667\n"
+				"Ss-1 stop...the f ngers in the dark\n"
+				"aa a u.u.u.u. crying clocks 181 2\n"
+				"i see everythn, nothin, somethin...?\n"
+				"3 - 9 ...and so it begins again...\n"
 			);
 			if (auto a = popup->m_mainLayer->getChildByType<TextArea>(0)) a->setOpacity(12);
 			findFirstChildRecursive<CCNode>(popup->m_mainLayer,
@@ -289,10 +338,32 @@ class $modify(MenuLayerExt, MenuLayer) {
 		menu->addChild(SimpleTextArea::create("             ", "bigFont.fnt", 1.5f)->getLines()[0]);
 
 		auto play = CCMenuItemExt::createSpriteExtra(
-			SimpleTextArea::create("play", "chatFont.fnt", 1.0f)->getLines()[0],
+			SimpleTextArea::create("continue", "chatFont.fnt", 1.0f)->getLines()[0],
 			[__this = Ref(this)](CCNode* item) { __this->onPlay(item); }
 		);
 		menu->addChild(play);
+
+		auto retry = CCMenuItemExt::createSpriteExtra(
+			SimpleTextArea::create("retry", "chatFont.fnt", 1.0f)->getLines()[0],
+			[__this = Ref(this)](CCNode* item) { 
+				createQuickPopup(
+					"reset?", "", "NO", "yes", [](void*, bool yes) {
+						if (not yes) return;
+						saves() = {};
+						saves()["reset"] = "Always watching... yet remains unseen. Hoping... and WAITING for YOU.";
+						getMod()->saveData();
+						game::restart();
+					}
+				);
+			}
+		);
+		menu->addChild(retry);
+
+		auto leave = CCMenuItemExt::createSpriteExtra(
+			SimpleTextArea::create("leave", "chatFont.fnt", 1.0f)->getLines()[0],
+			[__this = Ref(this)](CCNode* item) { __this->keyBackClicked(); }
+		);
+		menu->addChild(leave);
 
 		auto geode = CCMenuItemExt::createSpriteExtra(
 			SimpleTextArea::create("geode", "chatFont.fnt", 1.0f)->getLines()[0],
@@ -418,8 +489,7 @@ class $modify(CCSpriteFrameCacheExt, CCSpriteFrameCache) {
 	};
 };
 
-#include <user95401.main-levels-editor/include/level.hpp>
-#include <Geode/modify//////////////LevelSelectLayer.hpp>
+#include <Geode/modify/LevelSelectLayer.hpp>
 class $modify(LevelSelectLayerExt, LevelSelectLayer) {
 	static cocos2d::CCScene* scene(int p0) {
 		if (CCKeyboardDispatcher::get()->getControlKeyPressed()) return LevelSelectLayer::scene(p0);
