@@ -1,6 +1,7 @@
 #include <user95401.game-objects-factory/include/main.hpp>
 #include <user95401.game-objects-factory/include/impl.hpp>
 
+#define saves getMod()->getSaveContainer
 
 
 #include <Geode/modify/GJGameLoadingLayer.hpp>
@@ -50,6 +51,22 @@ class $modify(GameManagerSetsForGV, GameManager) {
 	};
 };
 
+#include <Geode/modify/TextArea.hpp>
+class $modify(DialogsTextAreaExt, TextArea) {
+	inline static Ref<CCNode> pDialogLayer = nullptr;
+	inline static bool EnableForNext = true;
+	static TextArea* create(
+		gd::string str, char const* font, float scale, float width,
+		cocos2d::CCPoint anchor, float lineHeight, bool disableColor
+	) {
+		if ((pDialogLayer and pDialogLayer->isRunning()) or EnableForNext) width = 282.000f;
+		EnableForNext = false;
+		return TextArea::create(
+			str, font, scale, width, //220.f
+			anchor, lineHeight, disableColor
+		);
+	}
+};
 
 class DataNode : public CCNode {
 public:
@@ -62,15 +79,12 @@ public:
 		parse[key] = val;
 		_json_str = parse.dump(matjson::NO_INDENTATION);
 	}
-
 	CREATE_FUNC(DataNode);
-
 	static auto create(std::string id) {
 		auto a = create();
 		a->setID(id);
 		return a;
 	}
-
 	static auto at(CCNode* container, std::string id = "") {
 		auto me = typeinfo_cast<DataNode*>(container->getUserObject(id));
 		if (!me) {
@@ -338,15 +352,17 @@ inline void SetupObjects() {
 
 				auto hide = false;
 				auto no_pause = false;
-				auto not_skippable = true;
+				auto unskipable = false;
 				auto character = std::string("");
 				auto characterFrame = 0;
+				auto hadCharacterFrame = false;
 
 				auto dialogObjectsArr = CCArrayExt<DialogObject>();
 
 				for (auto& val : data) {
 					if (val.isNumber()) {
 						characterFrame = val.asInt().unwrapOrDefault();
+						hadCharacterFrame = true;
 					}
 					if (val.isString()) {
 						auto text = val.asString().unwrapOrDefault();
@@ -363,32 +379,44 @@ inline void SetupObjects() {
 							if (place == "b") placement = DialogChatPlacement::Bottom;
 							continue;
 						}
-						if (text == "!") {
-							not_skippable = false;
-							continue;
-						}
+						if (text == "!") { unskipable = !unskipable; continue; }
 						if (string::contains(text, "->")) {
 							auto val = string::split(text, "->");
 							if (val.size() == 2) if (fileExistsInSearchPaths(val[0].c_str())) { //replace texture
-								CCFileUtils::get()->m_fullPathCache[val[0]] = CCFileUtils::get()->fullPathForFilename(val[1].c_str(), 0);
-								auto result = CCTextureCache::get()->reloadTexture(val[0].c_str());
-								if (!result) dialogObjectsArr.push_back(DialogObject::create(
-									"Failed to reload texture!", ("<cr>Key: " + val[0] + "\nBy: " + val[1] + "\n"), 0, 1.f, 1, ccWHITE
-								));
+								CCFileUtils::get()->m_fullPathCache.erase(val[0].c_str());
+								CCFileUtils::get()->m_fullPathCache.erase(val[1].c_str());
+								CCFileUtils::get()->m_fullPathCache[val[0].c_str()] = CCFileUtils::get()->fullPathForFilename(
+									val[1].c_str(), 0
+								);
+								CCTextureCache::get()->reloadTexture(val[0].c_str());
 								sharedDialogTriggerDelegate->m_replacedTextures += val[0] + ",";
 								continue;
 							}
 						}
-						if (string::startsWith(text, "!no_pause")) {
-							no_pause = true;
+						if (string::startsWith(text, "!levelup")) {
+							if (auto playlayer = GameManager::get()->m_playLayer) {
+								playlayer->pauseSchedulerAndActions();
+								saves()["level"] = saves()["level"].asInt().unwrapOr(0) + 1;
+								CCDirector::get()->replaceScene(LevelSelectLayer::scene(0));
+							}
+							continue; 
+						}
+						if (string::startsWith(text, "!no_pause")) { no_pause = true; continue; }
+						if (string::startsWith(text, "!hide")) { hide = true; continue; }
+						if (string::startsWith(text, "!exit")) { game::exit(); continue; }
+						if (string::startsWith(text, "!restart")) { game::restart(); continue; }
+						if (auto a = "!song:"; string::startsWith(text, a)) {
+							auto song = string::replace(text, a, "");
+							FMODAudioEngine::get()->playMusic(song, 1, 0.f, 0);
 							continue;
 						}
-						if (string::startsWith(text, "!hide")) {
-							hide = true;
+						if (auto a = "!sfx:"; string::startsWith(text, a)) {
+							auto sfx = string::replace(text, a, "");
+							FMODAudioEngine::get()->playEffect(sfx);
 							continue;
 						}
-						if (string::startsWith(text, "!plr_speed:")) {
-							auto speed = utils::numFromString<float>(string::replace(text, "!plr_speed:", "")).unwrapOrDefault();
+						if (auto a = "!plr_speed:"; string::startsWith(text, a)) {
+							auto speed = utils::numFromString<float>(string::replace(text, a, "")).unwrapOrDefault();
 							std::vector<Ref<PlayerObject>> ps = { game->m_player1, game->m_player2 };
 							for (auto& plr : ps) if (plr) plr->m_speedMultiplier = (speed);
 							continue;
@@ -402,7 +430,7 @@ inline void SetupObjects() {
 							continue;
 						}
 						dialogObjectsArr.push_back(DialogObject::create(
-							character, text, characterFrame, 1.f, not not_skippable, ccWHITE
+							character, text, characterFrame, 1.f, unskipable, ccWHITE
 						));
 					}
 				}
@@ -412,21 +440,26 @@ inline void SetupObjects() {
 				auto& dialog = sharedDialogTriggerDelegate->m_dialogLayer;
 				if (dialogObjectsArr.size()) {
 					if (dialog) dialog->removeFromParent();
+					DialogsTextAreaExt::EnableForNext = not hadCharacterFrame;
 					dialog = DialogLayer::createDialogLayer(
 						dialogObjectsArr[0], dialogObjectsArr.inner(), 1
 					);
+					if (not hadCharacterFrame) DialogsTextAreaExt::pDialogLayer = dialog;
 					dialog->m_delegate = sharedDialogTriggerDelegate;
 					dialog->updateChatPlacement(placement);
 					dialog->animateInRandomSide();
 					dialog->addToMainScene();
 					dialog->runAction(CCRepeatForever::create(CCSequence::create(CallFuncExt::create(
-						[dialog = Ref(dialog), layer = Ref(dialog->m_mainLayer)]() {
-							auto textArea = layer->getChildByType<TextArea*>(0);
-							auto someSprite = layer->getChildByType<CCSprite*>(0); //2 is icon, 3 is continue mark
-							if (textArea and someSprite) {
-								auto hasIcon = someSprite->getZOrder() == 2;
-								textArea->setAnchorPoint(hasIcon ? CCPointMake(0.000f, 0.5f) : CCPointMake(0.1f, 0.5f));
+						[dialog = Ref(dialog), l = Ref(dialog->m_mainLayer)]() {
+							auto someSprite = l->getChildByType<CCSprite*>(0); //2 is icon, 3 is continue mark
+							auto hasIcon = !someSprite ? false : someSprite->getZOrder() == 2;
+							if (Ref a = l->getChildByType<TextArea*>(0)) {
+								a->setPositionX(hasIcon ? -92.000f : -180.000f);
 							}
+							if (Ref a = l->getChildByType<CCLabelBMFont*>(0)) {
+								a->setPositionX(hasIcon ? -93.000f : -176.000f);
+							}
+							if (Ref a = l->getChildByType<CCScale9Sprite*>(1)) a->setOpacity(0);
 						}
 					), nullptr)));
 

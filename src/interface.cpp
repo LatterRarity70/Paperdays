@@ -72,7 +72,12 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 		);
 
 		auto text = SimpleTextArea::create(
-			"hold on control\nto seen avoid the", "chatFont.fnt", 2.f
+			"hold on control\n"
+			"to seen avoid the\n \n "
+			":WARN:\n"
+			"line4", 
+			
+			"chatFont.fnt", 2.f
 		);
 		text->setAlignment(kCCTextAlignmentCenter);
 		addChildAtPosition(text, Anchor::Center, { 0, 0 }, false);
@@ -81,10 +86,23 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 			CCShaky3D::create(0.01f, { 1, 1 }, 11, false),
 			CallFuncExt::create(
 				[__this = Ref(this), text = Ref(text)] {
-					if (__this->m_loadStep) text->setText(fmt::format(
-						"{}", 
-						__this->m_loadStep
-					));
+					if (__this->m_loadStep and text->getTag() != __this->m_loadStep) {
+						text->setTag(__this->m_loadStep);
+						text->setText(fmt::format(
+							"{}\n \n \n "
+							":WARN:\n"
+							"line4",
+							__this->m_loadStep
+						));
+					}
+
+					auto line4 = std::string(
+						"game contains self-harm imagery, graphic violence,\n"
+						"disturbing themes, strong language ^ .^"
+					);
+					text->getLines().at(4)->setAlignment(kCCTextAlignmentCenter);
+					text->getLines().at(4)->setString(line4.c_str());
+					text->getLines().at(4)->setScale(1.100f);
 
 					if (auto g = __this->m_pGrid) if (auto t = g->m_pTexture) t->setAliasTexParameters();
 				}
