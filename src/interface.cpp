@@ -523,7 +523,8 @@ class $modify(LevelSelectLayerExt, LevelSelectLayer) {
 		}
 		auto import = level::importLevelFile(path);
 		if (import.isOk()) {
-			auto xd = PlayLayer::scene(import.unwrapOrDefault(), 0, 0);
+			auto levelll = import.unwrapOrDefault();
+			auto xd = PlayLayer::scene(levelll ? levelll : GJGameLevel::create(), 0, 0);
 			return xd;
 		}
 		else {
