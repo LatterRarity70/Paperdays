@@ -48,7 +48,7 @@
 			"assets/sprites/**/*.png"
 		],
 		"spritesheets": {
-			"spritesheet1": [
+			"spritesheet": [
 				"assets/frames/**/*.png"
 			]
 		}
