@@ -5,6 +5,8 @@ using namespace geode::prelude;
 
 #include <user95401.main-levels-editor/include/level.hpp>
 
+bool static FLASHES_MODE = [] { srand(time(nullptr)); return rand() % 3 == 1; }();
+
 void disableIMEInpMod() {
 	auto mod = Loader::get()->getInstalledMod("alk.ime-input");
 	if (mod) for (auto hook : mod->getHooks()) if (hook) hook->disable();
@@ -161,6 +163,11 @@ class $modify(MenuLayerExt, MenuLayer) {
 		return MenuLayer::scene(isVideoOptionsOpen);
 	};
 	bool init() {
+
+		if (FLASHES_MODE) {
+			CCFileUtils::get()->m_fullPathCache["menuLoop.mp3"] = CCFileUtils::get()->fullPathForFilename("flashes.mp3"_spr, 0);
+		}
+
 		if (!MenuLayer::init()) return false;
 
 		if (CCKeyboardDispatcher::get()->getControlKeyPressed()) return true;
@@ -229,7 +236,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 						};
 						game::exit();
 					}
-					GameManager::get()->fadeInMusic("menuLoop.mp3");
+					GameManager::get()->playMenuMusic();
 					saves()["useful-confirmed"] = true;
 					getMod()->saveData();
 				}, !"show"
@@ -303,7 +310,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 		addChild(bg);
 		auto bganim1 = CCSprite::create("menuBG_1.png");
 		auto bganim2 = CCSprite::create("menuBG_11.png");
-		this->runAction(CCRepeatForever::create(CCSequence::create(
+		bg->runAction(CCRepeatForever::create(CCSequence::create(
 			CCDelayTime::create(1.0f),
 			CallFuncExt::create([bg = Ref(bg), anim = Ref(bganim2)] { bg->setDisplayFrame(anim->displayFrame()); }),
 			CCDelayTime::create(1.0f),
@@ -316,10 +323,12 @@ class $modify(MenuLayerExt, MenuLayer) {
 		CCFileUtils::get()->m_fullPathCache.erase("GJ_gradientBG.png");
 		flashes->setColor(ccWHITE);
 		addChild(flashes);
-		Ref flashes1 = CCSprite::create("flashes1.png");
-		Ref flashes2 = CCSprite::create("flashes2.png");
-		Ref flashes3 = CCSprite::create("flashes3.png");
-		std::vector<Ref<CCSprite>> flashes_list = { flashes1, flashes2, flashes3 };
+		std::vector<Ref<CCSprite>> flashes_list;
+		std::string flashTmpFILE = "flashes1.png";
+		while (fileExistsInSearchPaths(flashTmpFILE.c_str())) {
+			flashes_list.push_back(CCSprite::create(flashTmpFILE.c_str()));
+			flashTmpFILE = fmt::format("flashes{}.png", flashes_list.size());
+		}
 		flashes->runAction(CCRepeatForever::create(CCSequence::create(
 			CallFuncExt::create(
 				[flashes = Ref(flashes), flashes_list] {
@@ -331,6 +340,114 @@ class $modify(MenuLayerExt, MenuLayer) {
 			),
 			CCDelayTime::create(1.0f), CCHide::create(), CCDelayTime::create(15.0f), nullptr
 		)));
+
+		if (FLASHES_MODE) {
+			flashes->setVisible(false);
+			flashes->stopAllActions();
+			bg->stopAllActions();
+			bg->runAction(CCRepeatForever::create(CCSequence::create(CallFuncExt::create(
+				[bg = Ref(bg), _this = Ref(this), flashes_list] {
+					auto fmod = FMODAudioEngine::get();
+					if (!fmod->m_metering) fmod->enableMetering();
+					auto pulse = fmod->m_pulse1;//(fmod->m_pulse1 + fmod->m_pulse2 + fmod->m_pulse3) / 3;
+
+					if (false) {
+						_this->removeChildByTag("pulsedbg"_h);
+						auto pulsedbg = CCLabelBMFont::create((
+							fmt::format("{}\n \n", pulse)
+							+ fmt::format("{}\n", fmod->m_pulse1)
+							+ fmt::format("{}\n", fmod->m_pulse2)
+							+ fmt::format("{}\n \n", fmod->m_pulse3)
+							).c_str(), "gjFont18.fnt");
+						pulsedbg->setPosition(_this->getContentSize() / 2);
+						pulsedbg->setAnchorPoint(CCPointZero);
+						pulsedbg->setScale(0.325);
+						pulsedbg->setOpacity(90);
+						_this->addChild(pulsedbg, 999, "pulsedbg"_h);
+					}
+
+					if (auto program = bg->getShaderProgram()) {
+						program->use();
+						static float timeAccum = 0.0f;
+						timeAccum += 0.016f; // ~60fps
+						GLint timeLocation = glGetUniformLocation(program->getProgram(), "u_time");
+						if (timeLocation != -1) glUniform1f(timeLocation, timeAccum);
+						float glitchIntensity = pulse * 0.5f;
+						GLint intensityLocation = glGetUniformLocation(program->getProgram(), "u_glitchIntensity");
+						if (intensityLocation != -1) glUniform1f(intensityLocation, glitchIntensity);
+					}
+
+					if (auto g = bg->m_pGrid) if (auto t = g->m_pTexture) t->setAliasTexParameters();
+
+					if (pulse > 0.5f) {
+						auto nextflash = flashes_list[rand() % flashes_list.size()];
+						while (nextflash->getTexture() == bg->getTexture()) {
+							nextflash = flashes_list[rand() % flashes_list.size()];
+						}
+						bg->setDisplayFrame(nextflash->displayFrame());
+					}
+				}
+			), CCDelayTime::create(0.1f), nullptr)));
+
+			{
+				const GLchar* glitchVertexShader = R"(
+					attribute vec4 a_position;
+					attribute vec2 a_texCoord;
+					attribute vec4 a_color;
+					varying vec4 v_fragmentColor;
+					varying vec2 v_texCoord;
+					void main() {
+					    gl_Position = CC_MVPMatrix * a_position;
+					    v_fragmentColor = a_color;
+					    v_texCoord = a_texCoord;
+					})";
+				const GLchar* glitchFragmentShader = R"(
+					#ifdef GL_ES
+						precision mediump float;
+					#endif
+					varying vec4 v_fragmentColor;
+					varying vec2 v_texCoord;
+					uniform sampler2D CC_Texture0;
+					uniform float u_time;
+					uniform float u_glitchIntensity;
+
+					float rand(vec2 co) {
+					    return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+					}
+
+					void main(void) {
+					    vec2 uv = v_texCoord;
+					    float glitch = u_glitchIntensity;
+
+					    float splitAmount = rand(vec2(u_time, uv.y)) * glitch * 0.05;
+					    vec2 offset = vec2(splitAmount, 0.0);
+
+					    float r = texture2D(CC_Texture0, uv + offset).r;
+					    float g = texture2D(CC_Texture0, uv).g;
+					    float b = texture2D(CC_Texture0, uv - offset).b;
+
+					    float lineNoise = rand(vec2(u_time * 0.1, floor(uv.y * 100.0)));
+					    if (lineNoise > 0.95 - glitch * 0.3) {
+					        uv.x += (rand(vec2(u_time, uv.y)) - 0.5) * glitch * 0.2;
+					        r = texture2D(CC_Texture0, uv).r;
+					        g = texture2D(CC_Texture0, uv).g;
+					        b = texture2D(CC_Texture0, uv).b;
+					    }
+
+					    vec4 color = vec4(r, g, b, texture2D(CC_Texture0, v_texCoord).a);
+					    gl_FragColor = v_fragmentColor * color;
+					})";
+				auto program = new CCGLProgram();
+				program->initWithVertexShaderByteArray(glitchVertexShader, glitchFragmentShader);
+				program->addAttribute(kCCAttributeNamePosition, kCCVertexAttrib_Position);
+				program->addAttribute(kCCAttributeNameColor, kCCVertexAttrib_Color);
+				program->addAttribute(kCCAttributeNameTexCoord, kCCVertexAttrib_TexCoords);
+				program->link();
+				program->updateUniforms();
+				bg->setShaderProgram(program);
+				program->release();
+			}
+		}
 
 		CCFileUtils::get()->m_fullPathCache["GJ_gradientBG.png"] = CCFileUtils::get()->fullPathForFilename("menuBG_2.png", 0);
 		auto menubg = geode::createLayerBG();
@@ -402,9 +519,10 @@ class $modify(MenuLayerExt, MenuLayer) {
 		menu->setLayout(SimpleColumnLayout::create()->setGap(10.f)); 
 
 		findFirstChildRecursive<CCNode>(menu,
-			[](CCNode* node) {
+			[bg = Ref(bg)](CCNode* node) {
+				node->setShaderProgram(bg->getShaderProgram());
 				auto dl = 1.0f;
-				auto dt = CCDelayTime::create(1.f);
+				auto dt = CCDelayTime::create(FLASHES_MODE ? 0.1f : 1.f);
 				node->runAction(CCRepeatForever::create(CCSequence::create(
 					dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),
 					dt, CCRotateTo::create(0.f, CCRANDOM_MINUS1_1() / dl),

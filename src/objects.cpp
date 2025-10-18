@@ -405,6 +405,16 @@ inline void SetupObjects() {
 						if (string::startsWith(text, "!hide")) { hide = true; continue; }
 						if (string::startsWith(text, "!exit")) { game::exit(); continue; }
 						if (string::startsWith(text, "!restart")) { game::restart(); continue; }
+						if (auto a = "!activate:"; string::startsWith(text, a)) {
+							auto id = utils::numFromString<int>(string::replace(text, a, "")).unwrapOrDefault();
+							if (game) game->spawnGroup(id, false, 0, gd::vector<int>(), -1, -1);
+							continue;
+						}
+						if (auto a = "!toggle:"; string::startsWith(text, a)) {
+							auto id = utils::numFromString<float>(string::replace(text, a, "")).unwrapOrDefault();
+							if (game) game->toggleGroup(id, id > (int)id); //123,0 is on and 123,1 is off
+							continue;
+						}
 						if (auto a = "!song:"; string::startsWith(text, a)) {
 							auto song = string::replace(text, a, "");
 							FMODAudioEngine::get()->playMusic(song, 1, 0.f, 0);
@@ -421,7 +431,10 @@ inline void SetupObjects() {
 							for (auto& plr : ps) if (plr) plr->m_speedMultiplier = (speed);
 							continue;
 						}
-						bool idle = game->m_player1->m_isOnGround and fabs(game->m_player1->m_platformerXVelocity) < 0.25f;
+						bool idle = false;
+						idle = game->m_player1->m_isOnGround ? true : idle;
+						idle = fabs(game->m_player1->m_platformerXVelocity) < 0.25f ? true : idle;
+						idle = fabs(game->m_player1->m_yVelocity) < 0.25f ? true : idle;
 						if (string::startsWith(text, "!if_idle")) {
 							if (!idle) {
 								dialogObjectsArr.inner()->removeAllObjects();

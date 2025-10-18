@@ -264,7 +264,6 @@ class $modify(PlayerObjectExt, PlayerObject) {
 			static CCPoint hidep = { 9999999.f, 9999999.f };
 			static CCPoint showp = { 0.5f, 0.0f };
 
-			// Скрыть все спрайты
 			cocos::findFirstChildRecursive<CCSprite>(this,
 				[](CCSprite* node) {
 					if (string::contains(node->getID(), GEODE_MOD_ID)) node->setAnchorPoint(hidep);
@@ -362,6 +361,7 @@ class $modify(PlayerObjectExt, PlayerObject) {
 
 			m_yVelocityRelated = 0.f;
 			m_gravityMod = 0.f;
+			m_jumpBuffered = false;
 			m_isOnGround = true;
 
 			auto& btns = m_holdingButtons;
@@ -404,4 +404,176 @@ class $modify(PlayerObjectExt, PlayerObject) {
 			ptr->setVisible(true);
 		};
 	};
+};
+
+
+
+// https://github.com/Kingminer7/PlatformerJoystick/blob/main/src/JoystickNode.hpp
+// why reinvent the wheel ya? anyways i just getting away from dependencies
+class PD_Kingminer7sJoystickNode : public CCMenu {
+public:
+	static PD_Kingminer7sJoystickNode* create() {
+		auto ret = new PD_Kingminer7sJoystickNode;
+		if (!ret->init()) {
+			delete ret;
+			return nullptr;
+		}
+		ret->autorelease();
+		return ret;
+	};
+	bool init() override {
+		if (!CCMenu::init()) return false;
+		setContentSize({ 100, 100 });
+
+		m_bg = CCSprite::createWithSpriteFrameName("sliderthumb.png");
+		m_bg->setScale(getContentSize().width / m_bg->getContentSize().width);
+		if (auto a = m_bg->getTexture()) a->setAliasTexParameters();
+		addChildAtPosition(m_bg, Anchor::Center);
+
+		m_center = CCSprite::createWithSpriteFrameName("smallDot.png");
+		m_center->setScale(getContentSize().width / m_center->getContentSize().width / 3);
+		m_center->setZOrder(1);
+		if (auto a = m_center->getTexture()) a->setAliasTexParameters();
+		addChildAtPosition(m_center, Anchor::Center);
+
+		registerWithTouchDispatcher();
+
+		return true;
+	};
+	void draw() override { CCMenu::draw(); };
+	void registerWithTouchDispatcher() override {
+		CCTouchDispatcher::get()->addTargetedDelegate(this, -512, true);
+	};
+	bool ccTouchBegan(CCTouch* touch, CCEvent* event) override {
+		if (!isTouchEnabled() || !nodeIsVisible(this)) return false;
+		if (ccpDistance(getPosition(), touch->getLocation()) <= getScaledContentSize().width / 2) {
+			ccTouchMoved(touch, event);
+			return true;
+		}
+		return false;
+	};
+	void ccTouchEnded(CCTouch* touch, CCEvent* event) override {
+		if (auto uil = UILayer::get(); uil && uil->m_gameLayer) {
+			handleInput(uil->m_gameLayer, { 0, 0 }, m_currentInput);
+		}
+		m_currentInput = CCPoint{ 0, 0 };
+		m_center->setPosition(getScaledContentSize() / 2);
+	};
+	void ccTouchMoved(CCTouch* touch, CCEvent* event) override {
+		auto pos = convertToNodeSpace(touch->getLocation());
+		auto fromCenter = pos - getScaledContentSize() / 2;
+
+		if (fromCenter.getLength() > getScaledContentWidth() / 2 - m_center->getScaledContentWidth() / 2) {
+			fromCenter = fromCenter.normalize() * (getScaledContentWidth() / 2 - m_center->getScaledContentWidth() / 2);
+			pos = fromCenter + getScaledContentSize() / 2;
+		}
+
+		CCPoint inp = { 0, 0 };
+
+		auto angle = atan2(fromCenter.y, fromCenter.x);
+
+		if (std::abs(fromCenter.x) > std::abs(fromCenter.normalize().x) * 15) {
+			if (angle > 5 * -M_PI / 12 && angle < 5 * M_PI / 12) inp.x = 1;
+			else if (angle > 7 * M_PI / 12 || angle < 7 * -M_PI / 12) inp.x = -1;
+		}
+
+		if (std::abs(fromCenter.y) > std::abs(fromCenter.normalize().y) * 15) {
+			if (angle > M_PI / 12 && angle < 11 * M_PI / 12) inp.y = 1;
+			else if (angle < -M_PI / 12 && angle > -11 * M_PI / 12) inp.y = -1;
+		}
+
+		if (inp != m_currentInput) {
+			if (auto uil = UILayer::get(); uil && uil->m_gameLayer) {
+				handleInput(uil->m_gameLayer, inp, m_currentInput);
+			}
+		}
+		m_currentInput = inp;
+
+		m_center->setPosition(pos);
+	};
+	void ccTouchCancelled(CCTouch* touch, CCEvent* event) override {
+		ccTouchEnded(touch, event);
+	};
+	void handleInput(GJBaseGameLayer* layer, CCPoint input, CCPoint old) {
+		if (!layer->m_uiLayer) return;
+		Ref ui = layer->m_uiLayer;
+		//x
+		if (old.x == 1) layer->queueButton(3, false, false);
+		else if (old.x == -1) layer->queueButton(2, false, false);
+		if (input.x == 1) layer->queueButton(3, true, false);
+		else if (input.x == -1) layer->queueButton(2, true, false);
+		//y
+		if (old.y == 1) layer->queueButton(1, false, false);
+		else if (old.y == -1) ui->handleKeypress(KEY_S, false);
+		if (input.y == 1) layer->queueButton(1, true, false);
+		else if (input.y == -1) ui->handleKeypress(KEY_S, true);
+		//action
+		if (old.equals(input)) {
+			ui->handleKeypress(KEY_Z, 1);
+			queueInMainThread([=] { if (ui) ui->handleKeypress(KEY_Z, 0); });
+		}
+	};
+	void fakePosition() {
+		CCPoint pos = getContentSize() / 2 + m_currentInput * getContentWidth() / 2;
+
+		auto fromCenter = pos - getScaledContentSize() / 2;
+
+		if (fromCenter.getLength() > getScaledContentWidth() / 2 - m_center->getScaledContentWidth() / 2) {
+			fromCenter = fromCenter.normalize() * (getScaledContentWidth() / 2 - m_center->getScaledContentWidth() / 2);
+			pos = fromCenter + getScaledContentSize() / 2;
+		}
+
+		CCPoint inp = { 0, 0 };
+		auto angle = atan2(fromCenter.y, fromCenter.x);
+		if (std::abs(fromCenter.x) > std::abs(fromCenter.normalize().x) * 15) {
+			if (angle > 5 * -M_PI / 12 && angle < 5 * M_PI / 12) inp.x = 1;
+			else if (angle > 7 * M_PI / 12 || angle < 7 * -M_PI / 12) inp.x = -1;
+		}
+		if (std::abs(fromCenter.y) > std::abs(fromCenter.normalize().y) * 15) {
+			if (angle > M_PI / 12 && angle < 11 * M_PI / 12) inp.y = 1;
+			else if (angle < -M_PI / 12 && angle > -11 * M_PI / 12) inp.y = -1;
+		}
+
+		m_center->setPosition(pos);
+	};
+	CCSprite* m_bg = nullptr;
+	CCSprite* m_center = nullptr;
+	bool m_twoPlayer = false;
+	CCPoint m_currentInput = { 0, 0 };
+};
+
+#include <Geode/modify/UILayer.hpp>
+class $modify(JSUILayer, UILayer) {
+	struct Fields {
+		PD_Kingminer7sJoystickNode* m_joystickNode;
+		bool m_left = false;
+		bool m_right = false;
+	};
+	bool init(GJBaseGameLayer * gjbgl) {
+		if (!UILayer::init(gjbgl)) return false;
+		queueInMainThread(
+			[_this = Ref(this), gjbgl]() {
+				_this->m_fields->m_joystickNode = PD_Kingminer7sJoystickNode::create();
+				_this->m_fields->m_joystickNode->m_twoPlayer = gjbgl->m_level->m_twoPlayerMode;
+				_this->addChildAtPosition(_this->m_fields->m_joystickNode, Anchor::BottomLeft, { 75, 75 }, false);
+				_this->schedule(schedule_selector(JSUILayer::fixVisibility), 0.0f);//fixVisibility
+			}
+		);
+		return true;
+	}
+	void fixVisibility(float asd = 0.f) {
+		Ref dialog = CCScene::get()->getChildByType<DialogLayer>(-1);
+		if (!m_fields->m_joystickNode) return;
+		if (!m_inPlatformer or (dialog and dialog->isRunning())) {
+			m_fields->m_joystickNode->setVisible(false);
+			if (m_fields->m_joystickNode->isTouchEnabled()) m_fields->m_joystickNode->setTouchEnabled(false);
+			return;
+		}
+		if (!m_fields->m_joystickNode->isTouchEnabled()) m_fields->m_joystickNode->setTouchEnabled(true);
+		if (auto p1move = getChildByType<GJUINode>(0)) {
+			p1move->setPosition({ 10000, 10000 });
+			m_fields->m_joystickNode->setVisible(p1move->isVisible());
+			if (auto a = p1move->m_firstSprite) m_fields->m_joystickNode->setOpacity(a->getOpacity());
+		}
+	}
 };
