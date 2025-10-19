@@ -5,7 +5,12 @@ using namespace geode::prelude;
 
 #include <user95401.main-levels-editor/include/level.hpp>
 
-bool static FLASHES_MODE = [] { srand(time(nullptr)); return rand() % 3 == 1; }();
+auto static FLASHES_MODE = [] { 
+	srand(time(nullptr)); return rand() % 3 == 1; 
+	}();
+auto static FLASHES_SONG = [] { 
+	srand(time(nullptr)); return std::vector<const char*>{"flash1.mp3"_spr, "flash2.mp3"_spr}[rand() % 3];
+	}();
 
 void disableIMEInpMod() {
 	auto mod = Loader::get()->getInstalledMod("alk.ime-input");
@@ -165,7 +170,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 	bool init() {
 
 		if (FLASHES_MODE) {
-			CCFileUtils::get()->m_fullPathCache["menuLoop.mp3"] = CCFileUtils::get()->fullPathForFilename("flashes.mp3"_spr, 0);
+			CCFileUtils::get()->m_fullPathCache["menuLoop.mp3"] = CCFileUtils::get()->fullPathForFilename(FLASHES_SONG, 0);
 		}
 
 		if (!MenuLayer::init()) return false;
