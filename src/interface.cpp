@@ -5,12 +5,10 @@ using namespace geode::prelude;
 
 #include <user95401.main-levels-editor/include/level.hpp>
 
-auto static FLASHES_MODE = [] { 
-	srand(time(nullptr)); return rand() % 3 == 1; 
-	}();
-auto static FLASHES_SONG = [] { 
-	srand(time(nullptr)); return std::vector<const char*>{"flash1.mp3"_spr, "flash2.mp3"_spr}[rand() % 3];
-	}();
+auto static FLASHES_MODE = [] { srand(time(nullptr)); return rand() % 3 == 1; }();
+auto static FLASHES_SONG = [] { srand(time(nullptr)); return std::vector<const char*>{
+	"flash2.mp3"_spr, "flash1.mp3"_spr
+}[rand() % 2]; }();
 
 void disableIMEInpMod() {
 	auto mod = Loader::get()->getInstalledMod("alk.ime-input");
@@ -53,6 +51,8 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 		CCFileUtils::get()->m_fullPathCache["alphalaneous.happy_textures/bigFont.png"] = CCFileUtils::get()->fullPathForFilename(
 			"bigFont.png"_spr, 0
 		);
+
+		CCFileUtils::get()->m_fullPathCache["menuLoop.mp3"] = "";
 
 		for (auto path : file::readDirectory(getMod()->getResourcesDir()).unwrapOrDefault()) {
 			auto str = string::pathToString(path);
@@ -169,9 +169,9 @@ class $modify(MenuLayerExt, MenuLayer) {
 	};
 	bool init() {
 
-		if (FLASHES_MODE) {
-			CCFileUtils::get()->m_fullPathCache["menuLoop.mp3"] = CCFileUtils::get()->fullPathForFilename(FLASHES_SONG, 0);
-		}
+		CCFileUtils::get()->m_fullPathCache["menuLoop.mp3"] = CCFileUtils::get()->fullPathForFilename(
+			FLASHES_MODE ? FLASHES_SONG : "menuLoop.mp3"_spr, 0
+		);
 
 		if (!MenuLayer::init()) return false;
 
@@ -396,52 +396,66 @@ class $modify(MenuLayerExt, MenuLayer) {
 
 			{
 				const GLchar* glitchVertexShader = R"(
-					attribute vec4 a_position;
-					attribute vec2 a_texCoord;
-					attribute vec4 a_color;
-					varying vec4 v_fragmentColor;
-					varying vec2 v_texCoord;
-					void main() {
-					    gl_Position = CC_MVPMatrix * a_position;
-					    v_fragmentColor = a_color;
-					    v_texCoord = a_texCoord;
-					})";
+attribute vec4 a_position;
+attribute vec2 a_texCoord;
+attribute vec4 a_color;
+varying vec4 v_fragmentColor;
+varying vec2 v_texCoord;
+void main() {
+	gl_Position = CC_MVPMatrix * a_position;
+	v_fragmentColor = a_color;
+	v_texCoord = a_texCoord;
+})";
 				const GLchar* glitchFragmentShader = R"(
-					#ifdef GL_ES
-						precision mediump float;
-					#endif
-					varying vec4 v_fragmentColor;
-					varying vec2 v_texCoord;
-					uniform sampler2D CC_Texture0;
-					uniform float u_time;
-					uniform float u_glitchIntensity;
+#ifdef GL_ES
+	precision mediump float;
+#endif
+varying vec4 v_fragmentColor;
+varying vec2 v_texCoord;
+uniform sampler2D CC_Texture0;
+uniform float u_time;
+uniform float u_glitchIntensity;
 
-					float rand(vec2 co) {
-					    return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
-					}
+float rand(vec2 co) {
+	return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+}
 
-					void main(void) {
-					    vec2 uv = v_texCoord;
-					    float glitch = u_glitchIntensity;
+void main(void) {
+	vec2 uv = v_texCoord;
+	float glitch = u_glitchIntensity;
 
-					    float splitAmount = rand(vec2(u_time, uv.y)) * glitch * 0.05;
-					    vec2 offset = vec2(splitAmount, 0.0);
+	float jitterX = (rand(vec2(floor(uv.y * 200.0), u_time * 10.0)) - 0.5) * 0.01 * glitch;
+	float jitterY = (rand(vec2(floor(uv.x * 200.0), u_time * 10.0)) - 0.5) * 0.01 * glitch;
+	vec2 jitter = vec2(jitterX, jitterY);
 
-					    float r = texture2D(CC_Texture0, uv + offset).r;
-					    float g = texture2D(CC_Texture0, uv).g;
-					    float b = texture2D(CC_Texture0, uv - offset).b;
+	vec4 color = texture2D(CC_Texture0, uv + jitter);
 
-					    float lineNoise = rand(vec2(u_time * 0.1, floor(uv.y * 100.0)));
-					    if (lineNoise > 0.95 - glitch * 0.3) {
-					        uv.x += (rand(vec2(u_time, uv.y)) - 0.5) * glitch * 0.2;
-					        r = texture2D(CC_Texture0, uv).r;
-					        g = texture2D(CC_Texture0, uv).g;
-					        b = texture2D(CC_Texture0, uv).b;
-					    }
+	float splitAmount = glitch * 0.015;
+	float r = texture2D(CC_Texture0, uv + jitter + vec2(splitAmount, 0.0)).r;
+	float g = color.g;
+	float b = texture2D(CC_Texture0, uv + jitter - vec2(splitAmount, 0.0)).b;
 
-					    vec4 color = vec4(r, g, b, texture2D(CC_Texture0, v_texCoord).a);
-					    gl_FragColor = v_fragmentColor * color;
-					})";
+	float lineNoise = rand(vec2(u_time * 2.0, floor(uv.y * 100.0)));
+	if (lineNoise > 0.92 - glitch * 0.4) {
+		float offset = (rand(vec2(u_time, uv.y)) - 0.5) * glitch * 0.2;
+		vec2 distortedUV = vec2(uv.x + offset, uv.y);
+		r = texture2D(CC_Texture0, distortedUV + vec2(splitAmount, 0.0)).r;
+		g = texture2D(CC_Texture0, distortedUV).g;
+		b = texture2D(CC_Texture0, distortedUV - vec2(splitAmount, 0.0)).b;
+	}
+
+	float brightness = (r + g + b) / 3.0;
+	if (brightness > 0.7) {
+		float flicker = sin(u_time * 20.0 + uv.x * 100.0 + uv.y * 100.0) * 0.5 + 0.5;
+		flicker = mix(1.0, flicker, glitch * 0.4);
+		r *= flicker;
+		g *= flicker;
+		b *= flicker;
+	}
+
+	vec4 finalColor = vec4(r, g, b, color.a);
+	gl_FragColor = v_fragmentColor * finalColor;
+})";
 				auto program = new CCGLProgram();
 				program->initWithVertexShaderByteArray(glitchVertexShader, glitchFragmentShader);
 				program->addAttribute(kCCAttributeNamePosition, kCCVertexAttrib_Position);
@@ -524,8 +538,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 		menu->setLayout(SimpleColumnLayout::create()->setGap(10.f)); 
 
 		findFirstChildRecursive<CCNode>(menu,
-			[bg = Ref(bg)](CCNode* node) {
-				node->setShaderProgram(bg->getShaderProgram());
+			[](CCNode* node) {
 				auto dl = 1.0f;
 				auto dt = CCDelayTime::create(FLASHES_MODE ? 0.1f : 1.f);
 				node->runAction(CCRepeatForever::create(CCSequence::create(
