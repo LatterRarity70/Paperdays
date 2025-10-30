@@ -3,12 +3,23 @@ using namespace geode::prelude;
 
 #define saves getMod()->getSaveContainer
 
+namespace fs {
+	using namespace std::filesystem;
+	using namespace std::experimental::filesystem;
+	auto err = std::error_code{};
+};
+
 #include <user95401.main-levels-editor/include/level.hpp>
 
 auto static FLASHES_MODE = [] { srand(time(nullptr)); return rand() % 3 == 1; }();
 auto static FLASHES_SONG = [] { srand(time(nullptr)); return std::vector<const char*>{
 	"flash2.mp3"_spr, "flash1.mp3"_spr
 }[rand() % 2]; }();
+auto static LOADING_SONG = [] { srand(time(nullptr)); return std::vector<const char*>{
+	"""""loading.mp3"_spr, "loading.mp3"_spr,
+		"loading__ 1485147_In-The-Distance.mp3"_spr, //sounds like deltarune..?
+		"loading__ 1481139_i-feel-odd.mp3"_spr
+}[rand() % 3]; };
 
 void disableIMEInpMod() {
 	auto mod = Loader::get()->getInstalledMod("alk.ime-input");
@@ -37,9 +48,9 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 
 			if (string::containsAny(ext, { ".png", ".jpg", ".jpeg", ".plist" })) {
 				auto relativePath = std::filesystem::relative(entry.path(), resources_dir);
-				CCSpriteFrameCache::get()->addSpriteFrame(
-					CCSprite::create(string::pathToString(relativePath).c_str())->displayFrame(),
-					string::pathToString(relativePath).c_str()
+				auto sprite = CCSprite::create(string::pathToString(relativePath).c_str());
+				if (sprite) CCSpriteFrameCache::get()->addSpriteFrame(
+					sprite->displayFrame(), string::pathToString(relativePath).c_str()
 				);
 			}
 		}
@@ -79,10 +90,19 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 		);
 
 		auto text = SimpleTextArea::create(
-			"hold on control\n"
-			"to seen avoid the\n \n "
+			std::vector<std::string>{
+				"""""hold on control\n" 
+				"""""to seen avoid the",
+				"""""hi!\n ",
+				"""""i love you\n ",
+				"""""hi again :>\n ",
+				"""""lil scared\n ",
+				"""""hold on alternatives\n ",
+				"""""im watching you\n ",
+				"""""im sorry\n ",
+			}[rand() % 8] + "\n \n "
 			":WARN:\n"
-			"line4", 
+			"thats all is not real even",
 			
 			"chatFont.fnt", 2.f
 		);
@@ -120,7 +140,7 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 		FMODAudioEngine::get()->setBackgroundMusicVolume(GameManager::get()->m_bgVolume);
 		FMODAudioEngine::get()->setEffectsVolume(GameManager::get()->m_sfxVolume);
 
-		GameManager::get()->fadeInMusic("loading.mp3");
+		GameManager::get()->fadeInMusic(LOADING_SONG());
 		
 		return true;
 	}
@@ -561,6 +581,99 @@ void main(void) {
 				return false;
 			}
 		);
+
+		static auto id = getMod()->getID();
+		static auto repo = getMod()->getMetadataRef().getLinks().getSourceURL().value_or("https://github.com/LatterRarity70/Paperdays");
+		auto AltK = CCKeyboardDispatcher::get()->getAltKeyPressed();
+		if (AltK or fs::exists(getMod()->getBinaryPath().parent_path() / (id + ".android64.so"))) {
+			auto webListener = new EventListener<web::WebTask>;
+			webListener->bind(
+				[_this = Ref(this), webListener](web::WebTask::Event* e) {
+					if (web::WebProgress* prog = e->getProgress()) {
+						//log::debug("{}", prog->downloadTotal());
+
+						if (prog->downloadTotal() > 0) void(); else return;
+
+						auto installed_size = fs::file_size(getMod()->getPackagePath(), fs::err);
+						auto actual_size = prog->downloadTotal();
+
+						if (installed_size == actual_size) return;
+
+						auto pop = geode::createQuickPopup(
+							"Update!",
+							fmt::format(
+								"Latest release size mismatch with installed one!"
+								"\n" "Download latest release of mod?"
+							),
+							"Later.", "Yes", [_this](CCNode* pop, bool Yes) {
+								if (!Yes) return;
+
+								_this->setVisible(0);
+
+								GameManager::get()->fadeInMusic(LOADING_SONG());
+
+								auto req = web::WebRequest();
+
+								Ref state_win = Notification::create("Downloading... (///%)");
+								state_win->setTime(1337.f);
+								state_win->show();
+
+								if (state_win->m_pParent) {
+									auto loading_bg = CCSprite::create("GJ_gradientBG.png");
+									if (loading_bg) {
+										loading_bg->setID("loading_bg");
+										loading_bg->setAnchorPoint(CCPointMake(0.f, 0.f));
+										loading_bg->setScaleX(_this->getContentWidth() / loading_bg->getContentWidth());
+										loading_bg->setScaleY(_this->getContentHeight() / loading_bg->getContentHeight());
+										state_win->m_pParent->addChild(loading_bg);
+									}
+								}
+
+								auto listener = new EventListener<web::WebTask>;
+								listener->bind(
+									[state_win](web::WebTask::Event* e) {
+										if (web::WebProgress* prog = e->getProgress()) {
+											state_win->setString(fmt::format("Downloading... ({}%)", (int)prog->downloadProgress().value_or(000)));
+										}
+										if (web::WebResponse* res = e->getValue()) {
+											std::string data = res->string().unwrapOr("no res");
+											if (res->code() < 399) {
+												log::debug("{}", res->into(getMod()->getPackagePath()).err());
+												game::restart();
+											}
+											else {
+												auto asd = geode::createQuickPopup(
+													"Request exception",
+													data,
+													"Nah", nullptr, 420.f, nullptr, false
+												);
+												asd->show();
+											};
+										}
+									}
+								);
+
+								listener->setFilter(req.send(
+									"GET",
+									repo + "/releases/download/nightly/" + id + ".geode"
+								));
+
+							}, false
+						);
+						pop->m_scene = _this;
+						pop->show();
+
+						e->cancel();
+						webListener->disable();
+						delete webListener;
+					}
+				}
+			);
+			webListener->setFilter(
+				web::WebRequest().get(repo + "/releases/download/nightly/" + id + ".geode")
+			);
+		}
+		else Notification::create("Update check was aborted because its a dev build...")->show();
 
 		return true;
 	}

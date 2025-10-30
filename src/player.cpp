@@ -25,7 +25,6 @@ class $modify(UILayerPlayerKeysExt, UILayer) {
 		asd = key == CONTROLLER_A ? true : asd;
 		asd = key == KEY_Control ? true : asd;
 		asd = key == KEY_Enter ? true : asd;
-		asd = key == KEY_Space ? true : asd;
 		asd = key == KEY_Z ? true : asd;
 		if (!asd) return;
 		for (auto p : { m_gameLayer->m_player1, m_gameLayer->m_player2 }) if (p) {
@@ -107,17 +106,18 @@ class $modify(PlayerObjectExt, PlayerObject) {
 		
 		//add animations
 #define anim(name, amount, speed)																								\
-		auto name = CCSprite::createWithSpriteFrameName(#name"1.png"_spr);																			\
+		auto name = CCSprite::createWithSpriteFrameName(#name"1.png"_spr);														\
 		if (name) {																												\
+			if (auto a = name->getTexture()) a->setAliasTexParameters();														\
 			name->setID(#name##_spr);																							\
 			this->addChild(name);																								\
 			auto frames = CCArray::create();																					\
-			for (int i = 1; i <= amount; i++) if (auto sprite = CCSprite::createWithSpriteFrameName(												\
+			for (int i = 1; i <= amount; i++) if (auto sprite = CCSprite::createWithSpriteFrameName(							\
 				fmt::format("{}/"#name"{}.png", GEODE_MOD_ID, i).data()															\
 			)) frames->addObject(sprite->displayFrame());																		\
 			else log::warn("there is no {}/"#name"{}.png", GEODE_MOD_ID, i);													\
 			name->runAction(CCRepeatForever::create(CCAnimate::create(CCAnimation::createWithSpriteFrames(frames, speed))));	\
-		};
+		};																														\
 
 		anim(side_susie_idle, 2, 0.5f);
 		anim(side_susie_fallingdown, 2, 0.1f);
@@ -364,15 +364,17 @@ class $modify(PlayerObjectExt, PlayerObject) {
 			m_jumpBuffered = false;
 			m_isOnGround = true;
 
-			auto& btns = m_holdingButtons;
+			if (not m_controlsDisabled) {
+				auto& btns = m_holdingButtons;
 
-			auto mVel = 0.5f;
+				auto mVel = 0.5f;
 
-			yv = btns[0] or btns[1] ? mVel * m_speedMultiplier : 0.f;
-			yv = btns[0] ? -fabs(yv) : fabs(yv);
+				yv = btns[0] or btns[1] ? mVel * m_speedMultiplier : 0.f;
+				yv = btns[0] ? -fabs(yv) : fabs(yv);
 
-			xv = btns[2] or btns[3] ? mVel * m_speedMultiplier : 0.f;
-			xv = btns[2] ? -fabs(xv) : fabs(xv);
+				xv = btns[2] or btns[3] ? mVel * m_speedMultiplier : 0.f;
+				xv = btns[2] ? -fabs(xv) : fabs(xv);
+			};
 
 			auto asd = CCArrayExt<CCParticleSystemQuad*>(this->m_particleSystems);
 			asd.push_back(this->m_playerGroundParticles);
