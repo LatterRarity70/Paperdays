@@ -5,7 +5,6 @@ using namespace geode::prelude;
 
 namespace fs {
 	using namespace std::filesystem;
-	using namespace std::experimental::filesystem;
 	auto err = std::error_code{};
 };
 
