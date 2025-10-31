@@ -1,4 +1,5 @@
 #include <Geode/Geode.hpp>
+#include <Geode/ui/GeodeUI.hpp>
 using namespace geode::prelude;
 
 #define saves getMod()->getSaveContainer
@@ -496,7 +497,11 @@ void main(void) {
 		menu->setID("menu"_spr);
 		addChild(menu);
 
-		menu->addChild(SimpleTextArea::create(getMod()->getMetadataRef().getName(), "bigFont.fnt", 1.2f)->getLines()[0]);
+		auto title = CCMenuItemExt::createSpriteExtra(
+			SimpleTextArea::create(getMod()->getMetadataRef().getName(), "bigFont.fnt", 1.2f)->getLines()[0],
+			[__this = Ref(this)](CCNode* item) { openInfoPopup(getMod()); }
+		);
+		menu->addChild(title);
 
 		auto verl = SimpleTextArea::create(fmt::format(
 			"SDK {} on {}, Release {} (Dev, {})",
@@ -515,6 +520,12 @@ void main(void) {
 			[__this = Ref(this)](CCNode* item) { __this->onPlay(item); }
 		);
 		menu->addChild(play);
+
+		auto settings = CCMenuItemExt::createSpriteExtra(
+			SimpleTextArea::create("settings", "chatFont.fnt", 1.0f)->getLines()[0],
+			[__this = Ref(this)](CCNode* item) { __this->onOptions(item); }
+		);
+		menu->addChild(settings);
 
 		auto retry = CCMenuItemExt::createSpriteExtra(
 			SimpleTextArea::create("retry", "chatFont.fnt", 1.0f)->getLines()[0],
@@ -538,7 +549,7 @@ void main(void) {
 		);
 		menu->addChild(leave);
 
-		auto geode = CCMenuItemExt::createSpriteExtra(
+		/*auto geode = CCMenuItemExt::createSpriteExtra(
 			SimpleTextArea::create("geode", "chatFont.fnt", 1.0f)->getLines()[0],
 			[__this = Ref(this)](CCNode* item) { 
 				if (auto item = typeinfo_cast<CCMenuItem*>(__this->querySelector(
@@ -546,13 +557,7 @@ void main(void) {
 				))) item->activate();
 			}
 		);
-		menu->addChild(geode);
-
-		auto settings = CCMenuItemExt::createSpriteExtra(
-			SimpleTextArea::create("settings", "chatFont.fnt", 1.0f)->getLines()[0],
-			[__this = Ref(this)](CCNode* item) { __this->onOptions(item); }
-		);
-		menu->addChild(settings);
+		menu->addChild(geode);*/
 
 		menu->setLayout(SimpleColumnLayout::create()->setGap(10.f)); 
 
@@ -584,7 +589,7 @@ void main(void) {
 		static auto id = getMod()->getID();
 		static auto repo = getMod()->getMetadataRef().getLinks().getSourceURL().value_or("https://github.com/LatterRarity70/Paperdays");
 		auto AltK = CCKeyboardDispatcher::get()->getAltKeyPressed();
-		if (AltK or fs::exists(getMod()->getBinaryPath().parent_path() / (id + ".android64.so"))) {
+		if (AltK or not fs::exists(CMAKE_CURRENT_SOURCE_DIR)) {
 			auto webListener = new EventListener<web::WebTask>;
 			webListener->bind(
 				[_this = Ref(this), webListener](web::WebTask::Event* e) {
@@ -723,6 +728,14 @@ class $modify(NodeVisitController, CCNode) {
 		else {
 			Ref(this)->replaceColors();
 		}
+		if (Ref(this)->getID() == "options-menu" and !Ref(this)->getUserObject("done"_spr)) {
+			if (Ref a = Ref(this)->getChildByID("account-button")) a->setVisible(0);
+			if (Ref a = Ref(this)->getChildByID("how-to-play-button")) a->setVisible(0);
+			if (Ref a = Ref(this)->getChildByID("rate-button")) a->setVisible(0);
+			if (Ref a = Ref(this)->getChildByID("songs-button")) a->setVisible(0);
+			if (Ref a = Ref(this)->getChildByID("help-button")) a->setVisible(0);
+			Ref(this)->setUserObject("done"_spr, this);
+		}
 	}
 };
 
@@ -785,5 +798,70 @@ class $modify(LevelSelectLayerExt, LevelSelectLayer) {
 			)->show();
 			return LevelSelectLayer::scene(p0);
 		}
+	};
+};
+
+#include <Geode/modify/MoreOptionsLayer.hpp>
+class $modify(MoreOptionsLayerExt, MoreOptionsLayer) {
+	void goToPage(int p0) {
+		if (CCKeyboardDispatcher::get()->getControlKeyPressed()) return MoreOptionsLayer::goToPage(p0);
+		MoreOptionsLayer::goToPage(p0);
+		m_categoryLabel->setString(std::vector<const char*>{
+			"""""Options!",
+				"Options.",
+				"Options",
+				"Options :3",
+				"options here..",
+				"aw", "hi!", "ops"
+				")", ":>", ":3", ":D"
+		} [rand() % 10] );
+	}
+	void addToggle(char const* name, char const* tag, char const* desc) {
+		if (CCKeyboardDispatcher::get()->getControlKeyPressed()) return MoreOptionsLayer::addToggle(name, tag, desc);
+		log::debug("if (std::string(tag) == \"{}\") return; // {}", tag, matjson::Value(name).dump());
+
+		if (std::string(tag) == "0094") return; // "More Comments"
+		if (std::string(tag) == "0090") return; // "Load Comments"
+		if (std::string(tag) == "0073") return; // "New Completed Filter"
+		if (std::string(tag) == "0093") return; // "Increase Local Levels Per Page"
+		if (std::string(tag) == "0084") return; // "Manual Level Order"
+		if (std::string(tag) == "0099") return; // "Show Leaderboard Percentage"
+		if (std::string(tag) == "0127") return; // "Save Gauntlets"
+
+		if (std::string(tag) == "0125") return; // "Enable Normal Music In Editor"
+		if (std::string(tag) == "0174") return; // "Hide Playtest Text"
+		if (std::string(tag) == "0119") return; // "Disable Level Saving"
+		if (std::string(tag) == "0042") return; // "Increase Maximum Levels"
+
+		if (std::string(tag) == "0060") return; // "Default Mini Icon"
+		if (std::string(tag) == "0061") return; // "Switch Spider Teleport Color"
+		if (std::string(tag) == "0062") return; // "Switch Dash Fire Color"
+		if (std::string(tag) == "0096") return; // "Switch Wave Trail Color"
+
+		if (std::string(tag) == "0071") return; // "Hide Practice Buttons"
+		if (std::string(tag) == "0135") return; // "Hide Attempts" (practice)
+
+		if (std::string(tag) == "0024") return; // "Show Cursor In-Game"
+		if (std::string(tag) == "0129") return; // "Disable Portal Guide" 
+		if (std::string(tag) == "0130") return; // "Enable Orb Guide" 
+		if (std::string(tag) == "0140") return; // "Disable Orb Scale"
+		if (std::string(tag) == "0141") return; // "Disable Trigger Orb Scale"
+		if (std::string(tag) == "0072") return; // "Disable Gravity Effect"
+		if (std::string(tag) == "0100") return; // "Enable Death Effect"
+		if (std::string(tag) == "0082") return; // "Disable High Object Alert"
+		if (std::string(tag) == "0033") return; // "Change Custom Songs Location"
+		if (std::string(tag) == "0083") return; // "Disable Song Alert"
+		if (std::string(tag) == "0018") return; // "No Song Limit"
+		if (std::string(tag) == "0168") return; // "Fast Menu"
+		if (std::string(tag) == "0171") return; // "Disable Player Hitbox"
+		if (std::string(tag) == "0068") return; // Enable Quick Checkpoints (Ctrl+S style)
+		if (std::string(tag) == "0172") return; // Enable Shake
+		if (std::string(tag) == "0014") return; // Enable Explosion Shake
+		if (std::string(tag) == "0100") return; // Enable Death Effect
+		if (std::string(tag) == "0155") return; // Disable Shader AA - pixel-art 
+		if (std::string(tag) == "0066") return; // Increase Draw Capacity
+		if (std::string(tag) == "0166") return; // Hide Hitboxes
+
+		MoreOptionsLayer::addToggle(name, tag, desc);
 	};
 };

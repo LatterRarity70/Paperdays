@@ -43,14 +43,6 @@ class $modify(GJGameLoadingLayerWhatTheF, GJGameLoadingLayer) {
 	};
 };
 
-#include <Geode/modify/GameManager.hpp>
-class $modify(GameManagerSetsForGV, GameManager) {
-	bool getGameVariable(char const* p0) {
-		if (p0 == std::string("0024")) return true; //show mouse
-		return GameManager::getGameVariable(p0);
-	};
-};
-
 #include <Geode/modify/TextArea.hpp>
 class $modify(DialogsTextAreaExt, TextArea) {
 	inline static Ref<CCNode> pDialogLayer = nullptr;

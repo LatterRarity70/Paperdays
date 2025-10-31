@@ -48,6 +48,14 @@ class $modify(UILayerPlayerKeysExt, UILayer) {
 	}
 };
 
+#include <Geode/modify/PlayLayer.hpp>
+class $modify(PlayLayerExt, PlayLayer) {
+	void startMusic() {
+		return CCKeyboardDispatcher::get()->getControlKeyPressed()
+			? PlayLayer::startMusic() : void();
+	};
+};
+
 #include <Geode/modify/GJBaseGameLayer.hpp>
 class $modify(GJBaseGameLayerEventsExt, GJBaseGameLayer) {
 	void gameEventTriggered(GJGameEvent p0, int p1, int p2) {
@@ -543,8 +551,6 @@ public:
 	bool m_twoPlayer = false;
 	CCPoint m_currentInput = { 0, 0 };
 };
-
-#include <Geode/modify/UILayer.hpp>
 class $modify(JSUILayer, UILayer) {
 	struct Fields {
 		PD_Kingminer7sJoystickNode* m_joystickNode;
