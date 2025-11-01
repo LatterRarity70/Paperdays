@@ -51,8 +51,7 @@ class $modify(UILayerPlayerKeysExt, UILayer) {
 #include <Geode/modify/PlayLayer.hpp>
 class $modify(PlayLayerExt, PlayLayer) {
 	void startMusic() {
-		return CCKeyboardDispatcher::get()->getControlKeyPressed()
-			? PlayLayer::startMusic() : void();
+		return m_player1->m_isDead ? void() : PlayLayer::startMusic();
 	};
 };
 
@@ -91,8 +90,11 @@ class $modify(GJBaseGameLayerEventsExt, GJBaseGameLayer) {
 
 #include <Geode/modify/PlayerObject.hpp>
 class $modify(PlayerObjectExt, PlayerObject) {
+	inline static CCPoint hidep = { 9999999.f, 9999999.f };
+	inline static CCPoint showp = { 0.5f, 0.5f };
 	struct Fields {
 		PlayerObject* self;
+		CCSprite* m_deathSprite = nullptr;
 		float m_lastXV = 0.1;
 		float m_lastYV = 0.1;
 	};
@@ -156,6 +158,44 @@ class $modify(PlayerObjectExt, PlayerObject) {
 	void updateJump(float p0) {
 		if (!m_isSpider) PlayerObject::updateJump(p0);
 	}
+	void playDeathEffect() {
+		m_isDead = true;
+		m_fields->m_deathSprite = cocos::findFirstChildRecursive<CCSprite>(this,
+			[](CCSprite* node) {
+				if (!string::contains(node->getID(), GEODE_MOD_ID)) return false;
+				return node->getAnchorPoint().equals(showp);
+			}
+		);
+		if (Ref spr = m_fields->m_deathSprite) {
+			spr->pauseSchedulerAndActions();
+			this->runAction(CCSequence::create(
+				CallFuncExt::create([spr] { //5 frames
+					if (auto a = CCSpriteFrameCache::get()->spriteFrameByName(
+						"side_susie_die1.png"
+					))spr->setDisplayFrame(a); }),
+				CCDelayTime::create(0.1f),
+				CallFuncExt::create([spr] {
+					if (auto a = CCSpriteFrameCache::get()->spriteFrameByName(
+						"side_susie_die2.png"
+					)) spr->setDisplayFrame(a); }),
+				CCDelayTime::create(0.051f),
+				CallFuncExt::create([spr] {
+					if (auto a = CCSpriteFrameCache::get()->spriteFrameByName(
+						"side_susie_die3.png"
+					)) spr->setDisplayFrame(a); }),
+				CCDelayTime::create(0.052f),
+				CallFuncExt::create([spr] {
+					if (auto a = CCSpriteFrameCache::get()->spriteFrameByName(
+						"side_susie_die4.png"
+					)) spr->setDisplayFrame(a); }),
+				nullptr
+			));
+		}
+	}
+	void spawnCircle() {
+		m_isDead = false;
+		if (Ref a = m_fields->m_deathSprite) a->resumeSchedulerAndActions();
+	}
 	void ringJump(RingObject* p0, bool p1) {
 		if (m_isSpider) m_holdingButtons[5] ? PlayerObject::ringJump(p0, p1) : void();
 		else PlayerObject::ringJump(p0, p1);
@@ -184,7 +224,8 @@ class $modify(PlayerObjectExt, PlayerObject) {
 		CCSize size2 = { 15.000f, 3.000f };
 		CCSize def_size = { 30.000f, 30.000f };
 		auto& plrSZ = showAnimPlr or showTopAnimPlr ? 
-			(showAnimPlr ? size : size2) : def_size;
+			(showAnimPlr ? size : size2) 
+			: def_size;
 		this->m_obContentSize = plrSZ;
 		this->m_objectRect.size = plrSZ;
 		this->m_width = plrSZ.width;
@@ -197,8 +238,6 @@ class $modify(PlayerObjectExt, PlayerObject) {
 		Ref spr_player_jump = typeinfo_cast<CCSprite*>(this->querySelector("side_susie_flyingup"_spr));
 		if (spr_player_idle and spr_player_run and mainLayer) {
 			mainLayer->setVisible(!showAnimPlr);
-			static CCPoint hidep = { 9999999.f, 9999999.f };
-			static CCPoint showp = { 0.5f, 0.5f };
 			//hide all animates
 			cocos::findFirstChildRecursive<CCSprite>(this,
 				[](CCSprite* node) {
