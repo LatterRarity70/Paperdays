@@ -23,7 +23,6 @@ class $modify(UILayerPlayerKeysExt, UILayer) {
 	void actionButtonUpdate(enumKeyCodes key, bool p1) {
 		auto asd = false;
 		asd = key == CONTROLLER_A ? true : asd;
-		asd = key == KEY_Control ? true : asd;
 		asd = key == KEY_Enter ? true : asd;
 		asd = key == KEY_Z ? true : asd;
 		if (!asd) return;
@@ -601,6 +600,7 @@ class $modify(JSUILayer, UILayer) {
 		queueInMainThread(
 			[_this = Ref(this), gjbgl]() {
 				_this->m_fields->m_joystickNode = PD_Kingminer7sJoystickNode::create();
+				_this->m_fields->m_joystickNode->setZOrder(211);
 				_this->m_fields->m_joystickNode->m_twoPlayer = gjbgl->m_level->m_twoPlayerMode;
 				_this->addChildAtPosition(_this->m_fields->m_joystickNode, Anchor::BottomLeft, { 75, 75 }, false);
 				_this->schedule(schedule_selector(JSUILayer::fixVisibility), 0.0f);//fixVisibility
@@ -611,16 +611,27 @@ class $modify(JSUILayer, UILayer) {
 	void fixVisibility(float asd = 0.f) {
 		Ref dialog = CCScene::get()->getChildByType<DialogLayer>(-1);
 		if (!m_fields->m_joystickNode) return;
-		if (!m_inPlatformer or (dialog and dialog->isRunning())) {
-			m_fields->m_joystickNode->setVisible(false);
-			if (m_fields->m_joystickNode->isTouchEnabled()) m_fields->m_joystickNode->setTouchEnabled(false);
-			return;
+		Ref joystick = m_fields->m_joystickNode;
+
+		auto show = true;
+		//!m_inPlatformer or !m_gameLayer->m_player1->m_isSpider or (dialog and dialog->isRunning())
+		show = !m_inPlatformer ? false : show;
+		show = !m_gameLayer->m_player1->m_isSpider ? false : show;
+		show = (dialog and dialog->isRunning()) ? false : show;
+
+		joystick->setVisible(show);
+		if (joystick->isTouchEnabled() != show) {
+			joystick->setTouchEnabled(show);
+			if (!joystick->m_currentInput.equals({ 0, 0 })) 
+				joystick->handleInput(m_gameLayer, { 0, 0 }, joystick->m_currentInput);
+			for (auto a : m_gameLayer->m_player1->m_holdingButtons) 
+				m_gameLayer->m_player1->m_holdingButtons[a.first] = false;
 		}
-		if (!m_fields->m_joystickNode->isTouchEnabled()) m_fields->m_joystickNode->setTouchEnabled(true);
+
 		if (auto p1move = getChildByType<GJUINode>(0)) {
-			p1move->setPosition({ 10000, 10000 });
-			m_fields->m_joystickNode->setVisible(p1move->isVisible());
-			if (auto a = p1move->m_firstSprite) m_fields->m_joystickNode->setOpacity(a->getOpacity());
-		}
+			p1move->setScale(!show);
+			joystick->setVisible(show and p1move->isVisible());
+			if (auto a = p1move->m_firstSprite) joystick->setOpacity(a->getOpacity());
+		};
 	}
 };
