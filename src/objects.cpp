@@ -348,6 +348,11 @@ inline void SetupObjects() {
 				auto character = std::string("");
 				auto characterFrame = 0;
 				auto hadCharacterFrame = false;
+				auto opacity = std::optional<GLuint>(std::nullopt);
+				auto scale = std::optional<float>(std::nullopt);
+				auto px = std::optional<float>(std::nullopt);
+				auto py = std::optional<float>(std::nullopt);
+				auto animate = std::optional<int>(std::nullopt);
 
 				auto dialogObjectsArr = CCArrayExt<DialogObject>();
 
@@ -358,11 +363,46 @@ inline void SetupObjects() {
 					}
 					if (val.isString()) {
 						auto text = val.asString().unwrapOrDefault();
-						text = string::replace(text, "!char:", "!c:");
-						if (string::startsWith(text, "!c:")) {
-							character = string::replace(text, "!c:", "");
+
+						bool idle = true;
+						idle = game->m_player1->m_isOnGround ? idle : false;
+						idle = fabs(game->m_player1->m_platformerXVelocity) < 0.01f ? idle : false;
+						idle = fabs(game->m_player1->m_yVelocity) < 0.01f ? idle : false;
+						if (string::startsWith(text, "!if_idle")) {
+							if (!idle) {
+								dialogObjectsArr.inner()->removeAllObjects();
+								break;
+							}
 							continue;
 						}
+
+						if (text == "!") { unskipable = !unskipable; continue; }
+
+						if (auto a = "!op:"; string::startsWith(text, a)) {
+							opacity = utils::numFromString<int>(
+								string::replace(text, a, "")
+							).unwrapOrDefault();
+							continue;
+						}
+						if (auto a = "!s:"; string::startsWith(text, a)) {
+							scale = utils::numFromString<float>(
+								string::replace(text, a, "")
+							).unwrapOrDefault();
+							continue;
+						}
+						if (auto a = "!px:"; string::startsWith(text, a)) {
+							px = utils::numFromString<float>(
+								string::replace(text, a, "")
+							).unwrapOrDefault();
+							continue;
+						}
+						if (auto a = "!py:"; string::startsWith(text, a)) {
+							py = utils::numFromString<float>(
+								string::replace(text, a, "")
+							).unwrapOrDefault();
+							continue;
+						}
+
 						text = string::replace(text, "!place:", "!p:");
 						if (string::startsWith(text, "!p:")) {
 							auto place = string::replace(text, "!p:", "");
@@ -371,7 +411,13 @@ inline void SetupObjects() {
 							if (place == "b") placement = DialogChatPlacement::Bottom;
 							continue;
 						}
-						if (text == "!") { unskipable = !unskipable; continue; }
+
+						text = string::replace(text, "!char:", "!c:");
+						if (string::startsWith(text, "!c:")) {
+							character = string::replace(text, "!c:", "");
+							continue;
+						}
+
 						if (string::contains(text, "->")) {
 							auto val = string::split(text, "->");
 							if (val.size() == 2) if (fileExistsInSearchPaths(val[0].c_str())) { //replace texture
@@ -385,18 +431,30 @@ inline void SetupObjects() {
 								continue;
 							}
 						}
+
 						if (string::startsWith(text, "!levelup")) {
-							if (auto playlayer = GameManager::get()->m_playLayer) {
+							if (auto playlayer = GameManager::get()->m_playLayer; playlayer->isRunning()) {
 								playlayer->pauseSchedulerAndActions();
 								saves()["level"] = saves()["level"].asInt().unwrapOr(0) + 1;
 								CCDirector::get()->replaceScene(LevelSelectLayer::scene(0));
 							}
 							continue; 
 						}
+						if (auto a = "!level:"; string::startsWith(text, a)) {
+							auto id = utils::numFromString<int>(string::replace(text, a, "")).unwrapOrDefault();
+							saves()["level"] = id;
+							if (auto playlayer = GameManager::get()->m_playLayer; playlayer->isRunning()) {
+								playlayer->pauseSchedulerAndActions();
+								CCDirector::get()->replaceScene(LevelSelectLayer::scene(0));
+							}
+							continue;
+						}
+
 						if (string::startsWith(text, "!no_pause")) { no_pause = true; continue; }
 						if (string::startsWith(text, "!hide")) { hide = true; continue; }
 						if (string::startsWith(text, "!exit")) { game::exit(); continue; }
 						if (string::startsWith(text, "!restart")) { game::restart(); continue; }
+
 						if (auto a = "!activate:"; string::startsWith(text, a)) {
 							auto id = utils::numFromString<int>(string::replace(text, a, "")).unwrapOrDefault();
 							if (game) game->spawnGroup(id, false, 0, gd::vector<int>(), -1, -1);
@@ -407,6 +465,7 @@ inline void SetupObjects() {
 							if (game) game->toggleGroup(id, id > (int)id); //123,0 is on and 123,1 is off
 							continue;
 						}
+
 						if (auto a = "!song:"; string::startsWith(text, a)) {
 							auto song = string::replace(text, a, "");
 							FMODAudioEngine::get()->playMusic(song, 1, 0.f, 0);
@@ -417,23 +476,106 @@ inline void SetupObjects() {
 							FMODAudioEngine::get()->playEffect(sfx);
 							continue;
 						}
+
+						if (auto a = "!ntfy:"; string::startsWith(text, a)) {
+							auto args = string::split(string::replace(text, a, ""), "//");
+
+							auto str = args[0];
+							auto icon = NotificationIcon::None;
+							auto sprite = (CCSprite*)nullptr;
+							auto time = NOTIFICATION_DEFAULT_TIME;
+
+							if (args.size() > 1) {
+								auto id = utils::numFromString<int>(args[1]);
+								if (id.isOk()) icon = (NotificationIcon)id.unwrapOrDefault();
+								else {
+									sprite = CCSprite::createWithSpriteFrameName(args[1].c_str());
+									if (auto a = CCSprite::create(args[1].c_str())) sprite = a;
+								}
+							}
+							if (args.size() > 2) time = utils::numFromString<float>(
+								args[2]
+							).unwrapOrDefault();
+
+							if (sprite) Notification::create(str, sprite, time)->show();
+							else Notification::create(str, icon, time)->show();
+
+							continue;
+						}
+
+						if (auto a = "!popup:"; string::startsWith(text, a)) {
+							auto args = string::split(string::replace(text, a, ""), "//");
+
+							auto title = args[0];
+							auto cap = std::string("");
+							auto btn1 = std::string("OK");
+							auto btn2 = std::string();
+							auto group1 = 0;
+							auto group2 = 0;
+
+							if (args.size() > 1) cap = args[1];
+							if (args.size() > 2) {
+								auto spl = string::split(args[2], "->");
+								btn1 = spl[0];
+								if (spl.size() > 1) group1 = utils::numFromString<int>(spl[1]).unwrapOrDefault();
+							}
+							if (args.size() > 3) {
+								auto spl = string::split(args[3], "->");
+								btn2 = spl[0];
+								if (spl.size() > 1) group2 = utils::numFromString<int>(spl[1]).unwrapOrDefault();
+							}
+
+							if (game and game->isRunning()) {
+								auto scene = CCDirector::get()->m_pRunningScene;
+								CCDirector::get()->m_pRunningScene = (CCScene*)game->m_uiLayer;
+								CCDirector::get()->m_pRunningScene->setVisible(1);
+								if (not no_pause) {
+									game->setKeyboardEnabled(false);
+									game->setTouchEnabled(false);
+									game->pauseSchedulerAndActions();
+								}
+								auto popup = createQuickPopup(
+									title.c_str(), cap.c_str(),
+									btn1.empty() ? nullptr : btn1.c_str(),
+									btn2.empty() ? nullptr : btn2.c_str(),
+									[game = Ref(game), group1, group2](void* a, bool btn2) {
+										sharedDialogTriggerDelegate->dialogClosed((DialogLayer*)a);
+										if (game) game->spawnGroup(
+											btn2 ? group2 : group1, false, 0, gd::vector<int>(), -1, -1
+										);
+									}
+								);
+								CCDirector::get()->m_pRunningScene = scene;
+
+								if (placement != DialogChatPlacement::Center) {
+									popup->m_mainLayer->ignoreAnchorPointForPosition(false);
+									popup->m_mainLayer->setAnchorPoint(
+										{ 0.f, [](DialogChatPlacement placement) -> float {
+											if (placement == DialogChatPlacement::Top) return -0.250f;
+											if (placement == DialogChatPlacement::Bottom) return 0.250f;
+											return 0.f;
+										}(placement) }
+									);
+								}
+								if (opacity.has_value()) popup->setOpacity(opacity.value());
+								if (scale.has_value()) popup->setScale(scale.value());
+
+								auto ptmp = popup->m_mainLayer->getAnchorPoint();
+								if (px.has_value()) ptmp.x = px.value();
+								if (py.has_value()) ptmp.y = py.value();
+								popup->m_mainLayer->setAnchorPoint(ptmp);
+							}
+
+							continue;
+						}
+
 						if (auto a = "!plr_speed:"; string::startsWith(text, a)) {
 							auto speed = utils::numFromString<float>(string::replace(text, a, "")).unwrapOrDefault();
 							std::vector<Ref<PlayerObject>> ps = { game->m_player1, game->m_player2 };
 							for (auto& plr : ps) if (plr) plr->m_speedMultiplier = (speed);
 							continue;
 						}
-						bool idle = false;
-						idle = game->m_player1->m_isOnGround ? true : idle;
-						idle = fabs(game->m_player1->m_platformerXVelocity) < 0.25f ? true : idle;
-						idle = fabs(game->m_player1->m_yVelocity) < 0.25f ? true : idle;
-						if (string::startsWith(text, "!if_idle")) {
-							if (!idle) {
-								dialogObjectsArr.inner()->removeAllObjects();
-								break;
-							}
-							continue;
-						}
+
 						dialogObjectsArr.push_back(DialogObject::create(
 							character, text, characterFrame, 1.f, unskipable, ccWHITE
 						));
@@ -452,10 +594,18 @@ inline void SetupObjects() {
 					if (not hadCharacterFrame) DialogsTextAreaExt::pDialogLayer = dialog;
 					dialog->m_delegate = sharedDialogTriggerDelegate;
 					dialog->updateChatPlacement(placement);
-					dialog->animateInRandomSide();
-					dialog->addToMainScene();
+					if (animate.has_value()) dialog->animateIn(
+						(DialogAnimationType)animate.value()
+					); else dialog->animateInRandomSide();
+					if (game and game->isRunning()) {
+						auto scene = CCDirector::get()->m_pRunningScene;
+						CCDirector::get()->m_pRunningScene = (CCScene*)game->m_uiLayer;
+						CCDirector::get()->m_pRunningScene->setVisible(1);
+						dialog->addToMainScene();
+						CCDirector::get()->m_pRunningScene = scene;
+					}
 					dialog->runAction(CCRepeatForever::create(CCSequence::create(CallFuncExt::create(
-						[dialog = Ref(dialog), l = Ref(dialog->m_mainLayer)]() {
+						[dialog = Ref(dialog), l = Ref(dialog->m_mainLayer), opacity, scale, px, py]() {
 							auto someSprite = l->getChildByType<CCSprite*>(0); //2 is icon, 3 is continue mark
 							auto hasIcon = !someSprite ? false : someSprite->getZOrder() == 2;
 							if (Ref a = l->getChildByType<TextArea*>(0)) {
@@ -464,7 +614,16 @@ inline void SetupObjects() {
 							if (Ref a = l->getChildByType<CCLabelBMFont*>(0)) {
 								a->setPositionX(hasIcon ? -93.000f : -176.000f);
 							}
+
 							if (Ref a = l->getChildByType<CCScale9Sprite*>(1)) a->setOpacity(0);
+
+							if (opacity.has_value()) dialog->setOpacity(opacity.value());
+							if (scale.has_value()) dialog->m_mainLayer->setScale(scale.value());
+
+							auto ptmp = dialog->m_mainLayer->getAnchorPoint();
+							if (px.has_value()) ptmp.x = px.value();
+							if (py.has_value()) ptmp.y = py.value();
+							dialog->m_mainLayer->setAnchorPoint(ptmp);
 						}
 					), nullptr)));
 

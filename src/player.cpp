@@ -50,12 +50,21 @@ class $modify(UILayerPlayerKeysExt, UILayer) {
 #include <Geode/modify/PlayLayer.hpp>
 class $modify(PlayLayerExt, PlayLayer) {
 	void startMusic() {
-		return m_player1->m_isDead ? void() : PlayLayer::startMusic();
+		return getUserObject("audioOnDeath") ? void() : PlayLayer::startMusic();
 	};
 };
 
 #include <Geode/modify/GJBaseGameLayer.hpp>
 class $modify(GJBaseGameLayerEventsExt, GJBaseGameLayer) {
+	void processOptionsTrigger(GameOptionsTrigger * p0) {
+		GJBaseGameLayer::processOptionsTrigger(p0);
+		if (p0->m_audioOnDeath != GameOptionsSetting::Off) {
+			setUserObject("audioOnDeath",
+				p0->m_audioOnDeath == GameOptionsSetting::On ?
+				CCNode::create() : nullptr
+			);
+		};
+	};
 	void gameEventTriggered(GJGameEvent p0, int p1, int p2) {
 		auto eventID = static_cast<int>(p0);
 		auto audio = FMODAudioEngine::get();

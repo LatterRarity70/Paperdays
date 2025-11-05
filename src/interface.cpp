@@ -141,6 +141,17 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 		FMODAudioEngine::get()->setEffectsVolume(GameManager::get()->m_sfxVolume);
 
 		GameManager::get()->fadeInMusic(LOADING_SONG());
+
+		queueInMainThread([this_ = Ref(this)]
+			{
+				CCFileUtils::get()->m_fullPathCache["GJ_gradientBG.png"] = CCFileUtils::get()->fullPathForFilename(
+					"loadingBG.png", 0
+				);
+				auto menubg = geode::createLayerBG();
+				CCFileUtils::get()->m_fullPathCache.erase("GJ_gradientBG.png");
+				if (Ref a = this_->getParent()) a->addChild(menubg, -3);
+			}
+		);
 		
 		return true;
 	}
