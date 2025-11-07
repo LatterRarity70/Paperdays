@@ -1,30 +1,16 @@
 ## Paperdays
 
-upcoming game-in-game modification... xd
+A prototype mod that turns Geometry Dash into another game using the Geode SDK! 
 
-- dark interface and new sounds
-- animated char
-- new levels
+This thing is inspired by such great games as OMORI and UNDERTALE. 
 
-\- LatterRarity70, Paperdays
+Help a 13-year-old girl named Susie relive these vivid, blinding memories and decide if she is worthy of life. 
 
-<img src="logo.png" width="150" alt="the mod's logo" />
+Almost entire visual drawn using mouse, basicly having white on black.
 
-# Developing
-
-## Getting started
-We recommend heading over to [the getting started section on our docs](https://docs.geode-sdk.org/getting-started/) for useful info on what to do next.
-
-## Build instructions
-For more info, see [our docs](https://docs.geode-sdk.org/getting-started/create-mod#build)
-```sh
-# Assuming you have the Geode CLI set up already
-geode build
+```lua
+WARN: game contains self-harm imagery, graphic violence, disturbing themes
 ```
-
-## Resources
-* [Geode SDK Documentation](https://docs.geode-sdk.org/)
-* [Geode SDK Source Code](https://github.com/geode-sdk/geode/)
-* [Geode CLI](https://github.com/geode-sdk/cli)
-* [Bindings](https://github.com/geode-sdk/bindings/)
-* [Dev Tools](https://github.com/geode-sdk/DevTools)
+```bat
+THE CONTENT DEPICTED IS NOT A CALL TO ACTION OR AN INSTRUCTION!
+```
