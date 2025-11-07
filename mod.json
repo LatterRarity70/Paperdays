@@ -52,5 +52,10 @@
 				"assets/frames/**/*.png"
 			]
 		}
+	},
+	"api": {
+		"include": [
+			"resources/**/*.*"
+		]
 	}
 }

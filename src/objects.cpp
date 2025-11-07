@@ -349,9 +349,9 @@ inline void SetupObjects() {
 				auto characterFrame = 0;
 				auto hadCharacterFrame = false;
 				auto opacity = std::optional<GLuint>(std::nullopt);
-				auto scale = std::optional<float>(std::nullopt);
-				auto px = std::optional<float>(std::nullopt);
-				auto py = std::optional<float>(std::nullopt);
+				; auto scale = std::optional<float>(std::nullopt);
+				;;;; auto px = std::optional<float>(std::nullopt);
+				;;;; auto py = std::optional<float>(std::nullopt);
 				auto animate = std::optional<int>(std::nullopt);
 
 				auto dialogObjectsArr = CCArrayExt<DialogObject>();
@@ -376,6 +376,8 @@ inline void SetupObjects() {
 							continue;
 						}
 
+						if (string::startsWith(text, "!no_pause")) { no_pause = true; continue; }
+						if (string::startsWith(text, "!hide")) { hide = true; continue; }
 						if (text == "!") { unskipable = !unskipable; continue; }
 
 						if (auto a = "!op:"; string::startsWith(text, a)) {
@@ -450,8 +452,6 @@ inline void SetupObjects() {
 							continue;
 						}
 
-						if (string::startsWith(text, "!no_pause")) { no_pause = true; continue; }
-						if (string::startsWith(text, "!hide")) { hide = true; continue; }
 						if (string::startsWith(text, "!exit")) { game::exit(); continue; }
 						if (string::startsWith(text, "!restart")) { game::restart(); continue; }
 
