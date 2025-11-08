@@ -44,15 +44,14 @@ class $modify(GJGameLoadingLayerWhatTheF, GJGameLoadingLayer) {
 };
 
 #include <Geode/modify/TextArea.hpp>
-class $modify(DialogsTextAreaExt, TextArea) {
-	inline static Ref<CCNode> pDialogLayer = nullptr;
-	inline static bool EnableForNext = true;
+class $modify(DialogsTextAreaFixExt, TextArea) {
+	inline static bool EnableForNext = false;
 	static TextArea* create(
 		gd::string str, char const* font, float scale, float width,
 		cocos2d::CCPoint anchor, float lineHeight, bool disableColor
 	) {
-		if ((pDialogLayer and pDialogLayer->isRunning()) or EnableForNext) width = 282.000f;
-		EnableForNext = false;
+		//if (EnableForNext) width = 282.000f;
+		//EnableForNext = false;
 		return TextArea::create(
 			str, font, scale, width, //220.f
 			anchor, lineHeight, disableColor
@@ -300,8 +299,16 @@ inline void SetupObjects() {
 	);
 	svcondtrigger->registerMe();
 
-	class DialogTriggerDelegate : public DialogDelegate {
+}
+
+#include <Geode/modify/DialogLayer.hpp>
+class $modify(DialogTrigger, DialogLayer) {
+
+	class Delegate : public DialogDelegate, public CCNode {
 	public:
+		inline static Delegate* s_pForNextDialogLayer;
+		CREATE_FUNC(Delegate);
+
 		DialogLayer* m_dialogLayer = nullptr;
 		GJBaseGameLayer* m_game = nullptr;
 		std::string m_replacedTextures = "";
@@ -315,17 +322,42 @@ inline void SetupObjects() {
 				auto result = CCTextureCache::get()->reloadTexture(name.c_str());
 			}
 		};
-	};
-	static auto sharedDialogTriggerDelegate = new DialogTriggerDelegate();
 
-	GameObjectsFactory::registerGameObject(GameObjectsFactory::createTriggerConfig(
-		UNIQ_ID("papperdays-dialog-trigger"),
-		"edit_eEventLinkBtn_001.png",
-		[](EffectGameObject* trigger, GJBaseGameLayer* game, int p1, gd::vector<int> const* p2)
-		{
-			if (!trigger) return;
-			if (!game) return;
-			if (auto DialogTriggerDataNode = typeinfo_cast<CCNode*>(trigger->getUserObject("data"_spr))) {
+		DialogChatPlacement placement = DialogChatPlacement::Center;
+		bool hide = false;
+		bool no_pause = false;
+		bool unskipable = false;
+		std::string character = ("");
+		int characterFrame = 0;
+		bool hadCharacterFrame = false;
+		std::optional<GLuint> opacity = std::nullopt;
+		;; std::optional<float> scale = std::nullopt;
+		;;;;; std::optional<float> px = std::nullopt;
+		;;;;; std::optional<float> py = std::nullopt;
+		;; std::optional<int> animate = std::nullopt;
+	};
+
+	inline static GameObjectsFactory::GameObjectConfig* conf;
+	static void setup() {
+
+		GameObjectsFactory::registerGameObject(GameObjectsFactory::createTriggerConfig(
+			UNIQ_ID("papperdays-dialog-trigger"),
+			"edit_eEventLinkBtn_001.png",
+			[](EffectGameObject* trigger, GJBaseGameLayer* game, int p1, gd::vector<int> const* p2)
+			{
+				if (!trigger) return;
+				if (!game) return;
+
+				auto sharedDialogTriggerDelegate = typeinfo_cast<Delegate*>(
+					trigger->getUserObject("dialog-delegate")
+				);
+				if (!sharedDialogTriggerDelegate) return;
+
+				auto DialogTriggerDataNode = typeinfo_cast<CCNode*>(
+					trigger->getUserObject("data"_spr)
+				);
+				if (!DialogTriggerDataNode) return;
+
 				sharedDialogTriggerDelegate->m_game = game;
 				auto raw_data = "[" + DialogTriggerDataNode->getID() + "]";
 				auto parse = matjson::parse(raw_data);
@@ -333,28 +365,20 @@ inline void SetupObjects() {
 					? matjson::parse("[ \"<cr>err: " + parse.err().value().message + "</c>\" ]").unwrapOrDefault()
 					: parse.unwrapOrDefault();
 
-				/*
-					example text:
-					```
-					1,"char:the noone","<cr>hi!</c> why ar u here ever?","!","its feels bad you here"
-					```
-				*/
-
-				DialogChatPlacement placement = DialogChatPlacement::Center;
-
-				auto hide = false;
-				auto no_pause = false;
-				auto unskipable = false;
-				auto character = std::string("");
-				auto characterFrame = 0;
-				auto hadCharacterFrame = false;
-				auto opacity = std::optional<GLuint>(std::nullopt);
-				; auto scale = std::optional<float>(std::nullopt);
-				;;;; auto px = std::optional<float>(std::nullopt);
-				;;;; auto py = std::optional<float>(std::nullopt);
-				auto animate = std::optional<int>(std::nullopt);
-
 				auto dialogObjectsArr = CCArrayExt<DialogObject>();
+
+				auto& placement = sharedDialogTriggerDelegate->placement;
+				auto& hide = sharedDialogTriggerDelegate->hide;
+				auto& no_pause = sharedDialogTriggerDelegate->no_pause;
+				auto& unskipable = sharedDialogTriggerDelegate->unskipable;
+				auto& character = sharedDialogTriggerDelegate->character;
+				auto& characterFrame = sharedDialogTriggerDelegate->characterFrame;
+				auto& hadCharacterFrame = sharedDialogTriggerDelegate->hadCharacterFrame;
+				auto& opacity = sharedDialogTriggerDelegate->opacity;
+				auto& scale = sharedDialogTriggerDelegate->scale;
+				auto& px = sharedDialogTriggerDelegate->px;
+				auto& py = sharedDialogTriggerDelegate->py;
+				auto& animate = sharedDialogTriggerDelegate->animate;
 
 				for (auto& val : data) {
 					if (val.isNumber()) {
@@ -363,6 +387,20 @@ inline void SetupObjects() {
 					}
 					if (val.isString()) {
 						auto text = val.asString().unwrapOrDefault();
+
+						if (string::contains(text, "->")) {
+							auto val = string::split(text, "->");
+							if (val.size() == 2) if (fileExistsInSearchPaths(val[0].c_str())) { //replace texture
+								CCFileUtils::get()->m_fullPathCache.erase(val[0].c_str());
+								CCFileUtils::get()->m_fullPathCache.erase(val[1].c_str());
+								CCFileUtils::get()->m_fullPathCache[val[0].c_str()] = CCFileUtils::get()->fullPathForFilename(
+									val[1].c_str(), 0
+								);
+								CCTextureCache::get()->reloadTexture(val[0].c_str());
+								sharedDialogTriggerDelegate->m_replacedTextures += val[0] + ",";
+								continue;
+							}
+						}
 
 						bool idle = true;
 						idle = game->m_player1->m_isOnGround ? idle : false;
@@ -420,162 +458,6 @@ inline void SetupObjects() {
 							continue;
 						}
 
-						if (string::contains(text, "->")) {
-							auto val = string::split(text, "->");
-							if (val.size() == 2) if (fileExistsInSearchPaths(val[0].c_str())) { //replace texture
-								CCFileUtils::get()->m_fullPathCache.erase(val[0].c_str());
-								CCFileUtils::get()->m_fullPathCache.erase(val[1].c_str());
-								CCFileUtils::get()->m_fullPathCache[val[0].c_str()] = CCFileUtils::get()->fullPathForFilename(
-									val[1].c_str(), 0
-								);
-								CCTextureCache::get()->reloadTexture(val[0].c_str());
-								sharedDialogTriggerDelegate->m_replacedTextures += val[0] + ",";
-								continue;
-							}
-						}
-
-						if (string::startsWith(text, "!levelup")) {
-							if (auto playlayer = GameManager::get()->m_playLayer; playlayer->isRunning()) {
-								playlayer->pauseSchedulerAndActions();
-								saves()["level"] = saves()["level"].asInt().unwrapOr(0) + 1;
-								CCDirector::get()->replaceScene(LevelSelectLayer::scene(0));
-							}
-							continue; 
-						}
-						if (auto a = "!level:"; string::startsWith(text, a)) {
-							auto id = utils::numFromString<int>(string::replace(text, a, "")).unwrapOrDefault();
-							saves()["level"] = id;
-							if (auto playlayer = GameManager::get()->m_playLayer; playlayer->isRunning()) {
-								playlayer->pauseSchedulerAndActions();
-								CCDirector::get()->replaceScene(LevelSelectLayer::scene(0));
-							}
-							continue;
-						}
-
-						if (string::startsWith(text, "!exit")) { game::exit(); continue; }
-						if (string::startsWith(text, "!restart")) { game::restart(); continue; }
-
-						if (auto a = "!activate:"; string::startsWith(text, a)) {
-							auto id = utils::numFromString<int>(string::replace(text, a, "")).unwrapOrDefault();
-							if (game) game->spawnGroup(id, false, 0, gd::vector<int>(), -1, -1);
-							continue;
-						}
-						if (auto a = "!toggle:"; string::startsWith(text, a)) {
-							auto id = utils::numFromString<float>(string::replace(text, a, "")).unwrapOrDefault();
-							if (game) game->toggleGroup(id, id > (int)id); //123,0 is on and 123,1 is off
-							continue;
-						}
-
-						if (auto a = "!song:"; string::startsWith(text, a)) {
-							auto song = string::replace(text, a, "");
-							FMODAudioEngine::get()->playMusic(song, 1, 0.f, 0);
-							continue;
-						}
-						if (auto a = "!sfx:"; string::startsWith(text, a)) {
-							auto sfx = string::replace(text, a, "");
-							FMODAudioEngine::get()->playEffect(sfx);
-							continue;
-						}
-
-						if (auto a = "!ntfy:"; string::startsWith(text, a)) {
-							auto args = string::split(string::replace(text, a, ""), "//");
-
-							auto str = args[0];
-							auto icon = NotificationIcon::None;
-							auto sprite = (CCSprite*)nullptr;
-							auto time = NOTIFICATION_DEFAULT_TIME;
-
-							if (args.size() > 1) {
-								auto id = utils::numFromString<int>(args[1]);
-								if (id.isOk()) icon = (NotificationIcon)id.unwrapOrDefault();
-								else {
-									sprite = CCSprite::createWithSpriteFrameName(args[1].c_str());
-									if (auto a = CCSprite::create(args[1].c_str())) sprite = a;
-								}
-							}
-							if (args.size() > 2) time = utils::numFromString<float>(
-								args[2]
-							).unwrapOrDefault();
-
-							if (sprite) Notification::create(str, sprite, time)->show();
-							else Notification::create(str, icon, time)->show();
-
-							continue;
-						}
-
-						if (auto a = "!popup:"; string::startsWith(text, a)) {
-							auto args = string::split(string::replace(text, a, ""), "//");
-
-							auto title = args[0];
-							auto cap = std::string("");
-							auto btn1 = std::string("OK");
-							auto btn2 = std::string();
-							auto group1 = 0;
-							auto group2 = 0;
-
-							if (args.size() > 1) cap = args[1];
-							if (args.size() > 2) {
-								auto spl = string::split(args[2], "->");
-								btn1 = spl[0];
-								if (spl.size() > 1) group1 = utils::numFromString<int>(spl[1]).unwrapOrDefault();
-							}
-							if (args.size() > 3) {
-								auto spl = string::split(args[3], "->");
-								btn2 = spl[0];
-								if (spl.size() > 1) group2 = utils::numFromString<int>(spl[1]).unwrapOrDefault();
-							}
-
-							if (game and game->isRunning()) {
-								auto scene = CCDirector::get()->m_pRunningScene;
-								CCDirector::get()->m_pRunningScene = (CCScene*)game->m_uiLayer;
-								CCDirector::get()->m_pRunningScene->setVisible(1);
-								if (not no_pause) {
-									game->setKeyboardEnabled(false);
-									game->setTouchEnabled(false);
-									game->pauseSchedulerAndActions();
-								}
-								auto popup = createQuickPopup(
-									title.c_str(), cap.c_str(),
-									btn1.empty() ? nullptr : btn1.c_str(),
-									btn2.empty() ? nullptr : btn2.c_str(),
-									[game = Ref(game), group1, group2](void* a, bool btn2) {
-										sharedDialogTriggerDelegate->dialogClosed((DialogLayer*)a);
-										if (game) game->spawnGroup(
-											btn2 ? group2 : group1, false, 0, gd::vector<int>(), -1, -1
-										);
-									}
-								);
-								CCDirector::get()->m_pRunningScene = scene;
-
-								if (placement != DialogChatPlacement::Center) {
-									popup->m_mainLayer->ignoreAnchorPointForPosition(false);
-									popup->m_mainLayer->setAnchorPoint(
-										{ 0.f, [](DialogChatPlacement placement) -> float {
-											if (placement == DialogChatPlacement::Top) return -0.250f;
-											if (placement == DialogChatPlacement::Bottom) return 0.250f;
-											return 0.f;
-										}(placement) }
-									);
-								}
-								if (opacity.has_value()) popup->setOpacity(opacity.value());
-								if (scale.has_value()) popup->setScale(scale.value());
-
-								auto ptmp = popup->m_mainLayer->getAnchorPoint();
-								if (px.has_value()) ptmp.x = px.value();
-								if (py.has_value()) ptmp.y = py.value();
-								popup->m_mainLayer->setAnchorPoint(ptmp);
-							}
-
-							continue;
-						}
-
-						if (auto a = "!plr_speed:"; string::startsWith(text, a)) {
-							auto speed = utils::numFromString<float>(string::replace(text, a, "")).unwrapOrDefault();
-							std::vector<Ref<PlayerObject>> ps = { game->m_player1, game->m_player2 };
-							for (auto& plr : ps) if (plr) plr->m_speedMultiplier = (speed);
-							continue;
-						}
-
 						dialogObjectsArr.push_back(DialogObject::create(
 							character, text, characterFrame, 1.f, unskipable, ccWHITE
 						));
@@ -587,12 +469,10 @@ inline void SetupObjects() {
 				auto& dialog = sharedDialogTriggerDelegate->m_dialogLayer;
 				if (dialogObjectsArr.size()) {
 					if (dialog) dialog->removeFromParent();
-					DialogsTextAreaExt::EnableForNext = not hadCharacterFrame;
+					Delegate::s_pForNextDialogLayer = sharedDialogTriggerDelegate;
 					dialog = DialogLayer::createDialogLayer(
 						dialogObjectsArr[0], dialogObjectsArr.inner(), 1
 					);
-					if (not hadCharacterFrame) DialogsTextAreaExt::pDialogLayer = dialog;
-					dialog->m_delegate = sharedDialogTriggerDelegate;
 					dialog->updateChatPlacement(placement);
 					if (animate.has_value()) dialog->animateIn(
 						(DialogAnimationType)animate.value()
@@ -634,103 +514,316 @@ inline void SetupObjects() {
 					}
 				}
 				if (dialog and hide) dialog->removeFromParent();
-			}
-		},
-		[](EditTriggersPopup* popup, EffectGameObject* trigger, CCArray* objects)
-		{
-			if (!popup) return;
-			if (!trigger) return;
-			if (!objects) return;
-			if (auto data = typeinfo_cast<CCNode*>(trigger->getUserObject("data"_spr))) {
-				if (auto title = popup->getChildByType<CCLabelBMFont*>(0)) {
-					title->setString("");
-					title->setAnchorPoint(CCPointMake(0.5f, 0.3f));
-				}
-				if (auto inf = popup->m_buttonMenu->getChildByType<InfoAlertButton*>(0)) {
-					inf->setVisible(false);
-				}
-				if (auto a = popup->m_mainLayer->getChildByType<CCScale9Sprite*>(0)) {
-					a->setAnchorPoint(CCPointMake(0.5f, 0.900f));
-				}
 
-				auto input = TextInput::create(422.f, "Dialog data string...", "chatFont.fnt");
-				input->setFilter(" !\"#$ * &'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
-				input->getInputNode()->m_allowedChars = " !\"#$ * &'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
-				input->getInputNode()->m_textLabel->setWidth(input->getContentWidth() - 28.f);
-				input->setString(data->getID());
-				input->setPositionY(174.000f);
-				input->getBGSprite()->setContentHeight(350.000f);
-				input->setCallback(
-					[data = Ref(data)](const std::string& p0) {
-						data->setID(p0);
+			},
+			[](EditTriggersPopup* popup, EffectGameObject* trigger, CCArray* objects)
+			{
+				if (!popup) return;
+				if (!trigger) return;
+				if (!objects) return;
+				if (auto data = typeinfo_cast<CCNode*>(trigger->getUserObject("data"_spr))) {
+					if (auto title = popup->getChildByType<CCLabelBMFont*>(0)) {
+						title->setString("");
+						title->setAnchorPoint(CCPointMake(0.5f, 0.3f));
 					}
-				);
-				popup->m_buttonMenu->addChild(input);
-				popup->m_mainLayer->setPositionY(-92.000f);
+					if (auto inf = popup->m_buttonMenu->getChildByType<InfoAlertButton*>(0)) {
+						inf->setVisible(false);
+					}
+					if (auto a = popup->m_mainLayer->getChildByType<CCScale9Sprite*>(0)) {
+						a->setAnchorPoint(CCPointMake(0.5f, 0.900f));
+					}
 
-				auto editor = CCMenuItemExt::createSpriteExtra(
-					ButtonSprite::create("String Guide"), [input = Ref(input)](CCMenuItem*) {
-						web::openLinkInBrowser(
-							"https://github.com/LatterRarity70/Dialog-Trigger/tree/master?tab=readme-ov-file#dialog-string-format"
+					auto input = TextInput::create(422.f, "Dialog data string...", "chatFont.fnt");
+					input->setFilter(" !\"#$ * &'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+					input->getInputNode()->m_allowedChars = " !\"#$ * &'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+					input->getInputNode()->m_textLabel->setWidth(input->getContentWidth() - 28.f);
+					input->setString(data->getID());
+					input->setPositionY(174.000f);
+					input->getBGSprite()->setContentHeight(350.000f);
+					input->setCallback(
+						[data = Ref(data)](const std::string& p0) {
+							data->setID(p0);
+						}
+					);
+					popup->m_buttonMenu->addChild(input);
+					popup->m_mainLayer->setPositionY(-92.000f);
+
+					auto editor = CCMenuItemExt::createSpriteExtra(
+						ButtonSprite::create("String Guide"), [input = Ref(input)](CCMenuItem*) {
+							web::openLinkInBrowser(
+								"https://github.com/LatterRarity70/Dialog-Trigger/tree/master?tab=readme-ov-file#dialog-string-format"
+							);
+						}
+					);
+					editor->setPosition(CCPointMake(100.f, 28.f));
+					editor->setScale(0.55f);
+					editor->m_baseScale = (0.55f);
+					editor->m_scaleMultiplier = (1.0f + (0.61f - 0.55f));
+					popup->m_buttonMenu->addChild(editor);
+
+					auto Run = CCMenuItemExt::createSpriteExtra(
+						ButtonSprite::create("Run"), [trigger = Ref(trigger)](CCMenuItem*) {
+							trigger->triggerObject(GameManager::get()->m_gameLayer, 0, nullptr);
+						}
+					);
+					Run->setPosition(CCPointMake(144.f, 64.f));
+					popup->m_buttonMenu->addChild(Run);
+				}
+			}
+		)->customSetup(
+			[](GameObject* object)
+			{
+				if (!object) return object;
+				object->setUserObject("dialog-delegate", Delegate::create());
+				auto data = CCNode::create();
+				object->setUserObject("data"_spr, data);
+				object->m_objectType = GameObjectType::CustomRing;
+				object->m_hasNoEffects = true;
+				((RingObject*)object)->RingObject::m_claimTouch = true; //evil
+				return object;
+			}
+		)->saveString(
+			[](std::string str, GameObject* object, GJBaseGameLayer* level)
+			{
+				if (!object) return gd::string(str.c_str());
+				if (!level) return gd::string(str.c_str());
+				if (auto data = typeinfo_cast<CCNode*>(object->getUserObject("data"_spr))) {
+					str += ",228,";
+					str += ZipUtils::base64URLEncode(data->getID().c_str()).c_str();
+				}
+				return gd::string(str.c_str());
+			}
+		)->objectFromVector(
+			[](GameObject* object, gd::vector<gd::string>& p0, gd::vector<void*>&, void*, bool)
+			{
+				if (!object) return object;
+
+				auto data = typeinfo_cast<CCNode*>(object->getUserObject("data"_spr));
+				if (data) {
+					data->setID(ZipUtils::base64URLDecode(p0[228].c_str()).c_str());
+				};
+
+				return object;
+			}
+		)->activatedByPlayer(
+			[](EnhancedGameObject* asd, PlayerObject* lsd) {
+				asd->triggerObject(lsd->m_gameLayer, 0, nullptr);
+			}
+		));
+
+	};
+	static void onModify(auto&) { setup(); }
+
+	void skip(bool close = false) {
+		close ? queueInMainThread(
+			[_ = Ref(this)] { _->onClose(); }
+		) : queueInMainThread(
+			[_ = Ref(this)] { _->handleDialogTap(); }
+		);
+	};
+
+	bool processDialogObject(DialogObject* object) {
+
+		auto del = typeinfo_cast<Delegate*>(m_delegate);
+		if (!del) return false;
+
+		if (!del->m_game) return false;
+
+		auto& placement = del->placement;
+		auto& hide = del->hide;
+		auto& no_pause = del->no_pause;
+		auto& unskipable = del->unskipable;
+		auto& character = del->character;
+		auto& characterFrame = del->characterFrame;
+		auto& hadCharacterFrame = del->hadCharacterFrame;
+		auto& opacity = del->opacity;
+		auto& scale = del->scale;
+		auto& px = del->px;
+		auto& py = del->py;
+		auto& animate = del->animate;
+
+		std::string text = object->m_text.c_str();
+		log::debug("{}", text.c_str());
+
+		if (string::contains(text, "->")) {
+			auto val = string::split(text, "->");
+			if (val.size() == 2) if (fileExistsInSearchPaths(val[0].c_str())) { //replace texture
+				CCFileUtils::get()->m_fullPathCache.erase(val[0].c_str());
+				CCFileUtils::get()->m_fullPathCache.erase(val[1].c_str());
+				CCFileUtils::get()->m_fullPathCache[val[0].c_str()] = CCFileUtils::get()->fullPathForFilename(
+					val[1].c_str(), 0
+				);
+				CCTextureCache::get()->reloadTexture(val[0].c_str());
+				del->m_replacedTextures += val[0] + ",";
+				return true;
+			}
+		}
+
+		if (string::startsWith(text, "!levelup")) {
+			if (auto playlayer = GameManager::get()->m_playLayer; playlayer->isRunning()) {
+				playlayer->pauseSchedulerAndActions();
+				saves()["level"] = saves()["level"].asInt().unwrapOr(0) + 1;
+				CCDirector::get()->replaceScene(LevelSelectLayer::scene(0));
+			}
+			return true;
+		}
+		if (auto a = "!level:"; string::startsWith(text, a)) {
+			auto id = utils::numFromString<int>(string::replace(text, a, "")).unwrapOrDefault();
+			saves()["level"] = id;
+			if (auto playlayer = GameManager::get()->m_playLayer; playlayer->isRunning()) {
+				playlayer->pauseSchedulerAndActions();
+				CCDirector::get()->replaceScene(LevelSelectLayer::scene(0));
+			}
+			return true;
+		}
+
+		if (string::startsWith(text, "!exit")) { game::exit(); return true; }
+		if (string::startsWith(text, "!restart")) { game::restart(); return true; }
+
+		if (auto a = "!activate:"; string::startsWith(text, a)) {
+			auto id = utils::numFromString<int>(string::replace(text, a, "")).unwrapOrDefault();
+			if (del->m_game) del->m_game->spawnGroup(id, false, 0, gd::vector<int>(), -1, -1);
+			return true;
+		}
+		if (auto a = "!toggle:"; string::startsWith(text, a)) {
+			auto id = utils::numFromString<float>(string::replace(text, a, "")).unwrapOrDefault();
+			if (del->m_game) del->m_game->toggleGroup(id, id > (int)id); //123,0 is on and 123,1 is off
+			return true;
+		}
+
+		if (auto a = "!song:"; string::startsWith(text, a)) {
+			auto song = string::replace(text, a, "");
+			FMODAudioEngine::get()->playMusic(song, 1, 0.f, 0);
+			return true;
+		}
+		if (auto a = "!sfx:"; string::startsWith(text, a)) {
+			auto sfx = string::replace(text, a, "");
+			FMODAudioEngine::get()->playEffect(sfx);
+			return true;
+		}
+
+		if (auto a = "!ntfy:"; string::startsWith(text, a)) {
+			auto args = string::split(string::replace(text, a, ""), "//");
+
+			auto str = args[0];
+			auto icon = NotificationIcon::None;
+			auto sprite = (CCSprite*)nullptr;
+			auto time = NOTIFICATION_DEFAULT_TIME;
+
+			if (args.size() > 1) {
+				auto id = utils::numFromString<int>(args[1]);
+				if (id.isOk()) icon = (NotificationIcon)id.unwrapOrDefault();
+				else {
+					sprite = CCSprite::createWithSpriteFrameName(args[1].c_str());
+					if (auto a = CCSprite::create(args[1].c_str())) sprite = a;
+				}
+			}
+			if (args.size() > 2) time = utils::numFromString<float>(
+				args[2]
+			).unwrapOrDefault();
+
+			if (sprite) Notification::create(str, sprite, time)->show();
+			else Notification::create(str, icon, time)->show();
+
+			return true;
+		}
+
+		if (auto a = "!popup:"; string::startsWith(text, a)) {
+			auto args = string::split(string::replace(text, a, ""), "//");
+
+			auto title = args[0];
+			auto cap = std::string("");
+			auto btn1 = std::string("OK");
+			auto btn2 = std::string();
+			auto group1 = 0;
+			auto group2 = 0;
+
+			if (args.size() > 1) cap = args[1];
+			if (args.size() > 2) {
+				auto spl = string::split(args[2], "->");
+				btn1 = spl[0];
+				if (spl.size() > 1) group1 = utils::numFromString<int>(spl[1]).unwrapOrDefault();
+			}
+			if (args.size() > 3) {
+				auto spl = string::split(args[3], "->");
+				btn2 = spl[0];
+				if (spl.size() > 1) group2 = utils::numFromString<int>(spl[1]).unwrapOrDefault();
+			}
+
+			if (del->m_game and del->m_game->isRunning()) {
+				auto scene = CCDirector::get()->m_pRunningScene;
+				CCDirector::get()->m_pRunningScene = (CCScene*)del->m_game->m_uiLayer;
+				CCDirector::get()->m_pRunningScene->setVisible(1);
+				if (not no_pause) {
+					del->m_game->setKeyboardEnabled(false);
+					del->m_game->setTouchEnabled(false);
+					del->m_game->pauseSchedulerAndActions();
+				}
+				auto popup = createQuickPopup(
+					title.c_str(), cap.c_str(),
+					btn1.empty() ? nullptr : btn1.c_str(),
+					btn2.empty() ? nullptr : btn2.c_str(),
+					[game = Ref(del->m_game), del = Ref(del), group1, group2](void* a, bool btn2) {
+						del->dialogClosed((DialogLayer*)a);
+						if (game) game->spawnGroup(
+							btn2 ? group2 : group1, false, 0, gd::vector<int>(), -1, -1
 						);
 					}
 				);
-				editor->setPosition(CCPointMake(100.f, 28.f));
-				editor->setScale(0.55f);
-				editor->m_baseScale = (0.55f);
-				editor->m_scaleMultiplier = (1.0f + (0.61f - 0.55f));
-				popup->m_buttonMenu->addChild(editor);
+				CCDirector::get()->m_pRunningScene = scene;
 
-				auto Run = CCMenuItemExt::createSpriteExtra(
-					ButtonSprite::create("Run"), [trigger = Ref(trigger)](CCMenuItem*) {
-						trigger->triggerObject(GameManager::get()->m_gameLayer, 0, nullptr);
-					}
-				);
-				Run->setPosition(CCPointMake(144.f, 64.f));
-				popup->m_buttonMenu->addChild(Run);
+				if (placement != DialogChatPlacement::Center) {
+					popup->m_mainLayer->ignoreAnchorPointForPosition(false);
+					popup->m_mainLayer->setAnchorPoint(
+						{ 0.f, [](DialogChatPlacement placement) -> float {
+							if (placement == DialogChatPlacement::Top) return -0.250f;
+							if (placement == DialogChatPlacement::Bottom) return 0.250f;
+							return 0.f;
+						}(placement) }
+					);
+				}
+				if (opacity.has_value()) popup->setOpacity(opacity.value());
+				if (scale.has_value()) popup->setScale(scale.value());
+
+				auto ptmp = popup->m_mainLayer->getAnchorPoint();
+				if (px.has_value()) ptmp.x = px.value();
+				if (py.has_value()) ptmp.y = py.value();
+				popup->m_mainLayer->setAnchorPoint(ptmp);
 			}
-		}
-	)->customSetup(
-		[](GameObject* object)
-		{
-			if (!object) return object;
-			auto data = CCNode::create();
-			object->setUserObject("data"_spr, data);
-			object->m_objectType = GameObjectType::CustomRing;
-			object->m_hasNoEffects = true;
-			((RingObject*)object)->RingObject::m_claimTouch = true; //evil
-			return object;
-		}
-	)->saveString(
-		[](std::string str, GameObject* object, GJBaseGameLayer* level)
-		{
-			if (!object) return gd::string(str.c_str());
-			if (!level) return gd::string(str.c_str());
-			if (auto data = typeinfo_cast<CCNode*>(object->getUserObject("data"_spr))) {
-				str += ",228,";
-				str += ZipUtils::base64URLEncode(data->getID().c_str()).c_str();
-			}
-			return gd::string(str.c_str());
-		}
-	)->objectFromVector(
-		[](GameObject* object, gd::vector<gd::string>& p0, gd::vector<void*>&, void*, bool)
-		{
-			if (!object) return object;
 
-			auto data = typeinfo_cast<CCNode*>(object->getUserObject("data"_spr));
-			if (data) {
-				data->setID(ZipUtils::base64URLDecode(p0[228].c_str()).c_str());
-			};
-
-			return object;
+			return true;
 		}
-	)->activatedByPlayer(
-		[](EnhancedGameObject* asd, PlayerObject* lsd) {
-			asd->triggerObject(lsd->m_gameLayer, 0, nullptr);
-		}
-	));
 
-}
+		if (auto a = "!plr_speed:"; string::startsWith(text, a)) {
+			auto speed = utils::numFromString<float>(string::replace(text, a, "")).unwrapOrDefault();
+			std::vector<Ref<PlayerObject>> ps = { del->m_game->m_player1, del->m_game->m_player2 };
+			for (auto& plr : ps) if (plr) plr->m_speedMultiplier = (speed);
+			return true;
+		}
+
+		if (string::startsWith(text, "!close")) {
+			queueInMainThread([_ = Ref(this)] { _->onClose(); });
+		}
+		if (string::startsWith(text, "!tap")) {
+			queueInMainThread([_ = Ref(this)] { _->handleDialogTap(); });
+		}
+
+		return false;
+	}
+
+	void displayDialogObject(DialogObject* object) {
+		processDialogObject(object) ? skip() : DialogLayer::displayDialogObject(object);
+	};
+
+	bool init(DialogObject* object, cocos2d::CCArray* objects, int background) {
+		m_delegate = m_delegate ? m_delegate : Delegate::s_pForNextDialogLayer;
+		if (!DialogLayer::init(object, objects, background)) return false;
+		return true;
+	};
+
+	void displayNextObject_() {};
+
+};
 
 #include <Geode/modify/EffectGameObject.hpp>
 class $modify(MenuItemGameObject, EffectGameObject) {
@@ -948,7 +1041,6 @@ class $modify(MenuItemGameObject, EffectGameObject) {
 	};
 
 };
-
 
 #include <Geode/modify/UILayer.hpp>
 class $modify(UILayerKeysExt, UILayer) {
