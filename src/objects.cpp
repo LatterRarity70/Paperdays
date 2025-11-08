@@ -616,9 +616,9 @@ class $modify(DialogTrigger, DialogLayer) {
 
 	void skip(bool close = false) {
 		close ? queueInMainThread(
-			[_ = Ref(this)] { _->onClose(); }
+			[xd = Ref(this)] { xd->onClose(); }
 		) : queueInMainThread(
-			[_ = Ref(this)] { _->handleDialogTap(); }
+			[xd = Ref(this)] { xd->handleDialogTap(); }
 		);
 	};
 
@@ -802,10 +802,10 @@ class $modify(DialogTrigger, DialogLayer) {
 		}
 
 		if (string::startsWith(text, "!close")) {
-			queueInMainThread([_ = Ref(this)] { _->onClose(); });
+			queueInMainThread([xd = Ref(this)] { xd->onClose(); });
 		}
 		if (string::startsWith(text, "!tap")) {
-			queueInMainThread([_ = Ref(this)] { _->handleDialogTap(); });
+			queueInMainThread([xd = Ref(this)] { xd->handleDialogTap(); });
 		}
 
 		return false;
