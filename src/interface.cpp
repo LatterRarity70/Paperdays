@@ -9,17 +9,21 @@ namespace fs {
 	auto err = std::error_code{};
 };
 
-#include <user95401.main-levels-editor/include/level.hpp>
+#include <lr70.main-levels-editor/include/level.hpp>
 
-auto static FLASHES_MODE = [] { srand(time(nullptr)); return rand() % 3 == 1; }();
+auto static FLASHES_MODE = [] { 
+	if (saves()["level"].asInt().unwrapOr(0) == 3) return true;
+	srand(time(nullptr)); return rand() % 3 == 1; 
+	}();
 auto static FLASHES_SONG = [] { srand(time(nullptr)); return std::vector<const char*>{
-	"flash2.mp3"_spr, "flash1.mp3"_spr
-}[rand() % 2]; }();
+	"flash2.mp3"_spr, "flash1.mp3"_spr,
+	"usedcvnt - aesthetics of self-destruction.mp3"_spr,
+}[rand() % 3]; };
 auto static LOADING_SONG = [] { srand(time(nullptr)); return std::vector<const char*>{
 	"""""loading.mp3"_spr, "loading.mp3"_spr,
 		"loading__ 1485147_In-The-Distance.mp3"_spr, //sounds like deltarune..?
 		"loading__ 1481139_i-feel-odd.mp3"_spr
-}[rand() % 3]; };
+}[rand() % 4]; };
 
 void disableIMEInpMod() {
 	auto mod = Loader::get()->getInstalledMod("alk.ime-input");
@@ -97,6 +101,7 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 				"""""i love you\n ",
 				"""""hi again :>\n ",
 				"""""lil scared\n ",
+				"""""proper_dies\n ",
 				"""""hold on alternatives\n ",
 				"""""im watching you\n ",
 				"""""im sorry\n ",
@@ -201,7 +206,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 	bool init() {
 
 		CCFileUtils::get()->m_fullPathCache["menuLoop.mp3"] = CCFileUtils::get()->fullPathForFilename(
-			FLASHES_MODE ? FLASHES_SONG : "menuLoop.mp3"_spr, 0
+			FLASHES_MODE ? FLASHES_SONG() : "menuLoop.mp3"_spr, 0
 		);
 
 		if (!MenuLayer::init()) return false;
@@ -377,15 +382,20 @@ class $modify(MenuLayerExt, MenuLayer) {
 			CCDelayTime::create(1.0f), CCHide::create(), CCDelayTime::create(15.0f), nullptr
 		)));
 
+		auto menu = CCMenu::create();
+		menu->setID("menu"_spr);
+
 		if (FLASHES_MODE) {
+			auto static lastPulse = 0.0f;
 			flashes->setVisible(false);
 			flashes->stopAllActions();
 			bg->stopAllActions();
 			bg->runAction(CCRepeatForever::create(CCSequence::create(CallFuncExt::create(
-				[bg = Ref(bg), _this = Ref(this), flashes_list] {
+				[bg = Ref(bg), menu = Ref(menu), _this = Ref(this), flashes_list] {
 					auto fmod = FMODAudioEngine::get();
 					if (!fmod->m_metering) fmod->enableMetering();
 					auto pulse = fmod->m_pulse1;//(fmod->m_pulse1 + fmod->m_pulse2 + fmod->m_pulse3) / 3;
+					lastPulse = pulse;
 
 					if (false) {
 						_this->removeChildByTag("pulsedbg"_h);
@@ -402,6 +412,8 @@ class $modify(MenuLayerExt, MenuLayer) {
 						_this->addChild(pulsedbg, 999, "pulsedbg"_h);
 					}
 
+					menu->setScale(1.0f + pulse * 0.1f);
+
 					if (auto program = bg->getShaderProgram()) {
 						program->use();
 						static float timeAccum = 0.0f;
@@ -415,7 +427,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 
 					if (auto g = bg->m_pGrid) if (auto t = g->m_pTexture) t->setAliasTexParameters();
 
-					if (pulse > 0.5f) {
+					if (pulse > 0.5) {
 						auto nextflash = flashes_list[rand() % flashes_list.size()];
 						while (nextflash->getTexture() == bg->getTexture()) {
 							nextflash = flashes_list[rand() % flashes_list.size()];
@@ -504,8 +516,6 @@ void main(void) {
 		CCFileUtils::get()->m_fullPathCache.erase("GJ_gradientBG.png");
 		addChild(menubg);
 
-		auto menu = CCMenu::create();
-		menu->setID("menu"_spr);
 		addChild(menu);
 
 		auto title = CCMenuItemExt::createSpriteExtra(
@@ -724,6 +734,9 @@ class $modify(NodeVisitController, CCNode) {
 			repl(ccc3(114, 63, 31), ccc3(17, 17, 17));//search-id gd
 		};
 #undef repl
+	}
+	$override void addChild(CCNode* child, int zOrder, int tag) {
+		if (child) CCNode::addChild(child, zOrder, tag);
 	}
 	$override void visit() {
 		CCNode::visit();

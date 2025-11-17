@@ -20,24 +20,30 @@ class $modify(UILayerPlayerKeysExt, UILayer) {
 			p->m_holdingButtons[0] = p1;
 		}
 	}
-	void actionButtonUpdate(enumKeyCodes key, bool p1) {
+	void actionButtonUpdate(enumKeyCodes key, bool pressed) {
 		auto asd = false;
 		asd = key == CONTROLLER_A ? true : asd;
 		asd = key == KEY_Enter ? true : asd;
 		asd = key == KEY_Z ? true : asd;
 		if (!asd) return;
-		for (auto p : { m_gameLayer->m_player1, m_gameLayer->m_player2 }) if (p) {
-			p->m_holdingButtons[5] = p1;
-			if (p1) {
-				if (Ref dialog = CCScene::get()->getChildByType<DialogLayer>(-1)) {
-					if (!dialog->m_animating) dialog->handleDialogTap();
-				}
-				else {
-					p->pushButton(PlayerButton::Jump);
-					queueInMainThread([=] { p->releaseButton(PlayerButton::Jump); });
+		Ref p = m_gameLayer->m_player1;
+		if (!p) return;
+		p->m_holdingButtons[5] = pressed;
+		if (pressed and !p->m_holdingButtons[1]) {
+			if (Ref dialog = this->getChildByType<DialogLayer>(-1)) {
+				if (dialog->m_handleTap) {
+					dialog->m_touchID = 0;
+					dialog->handleDialogTap();
 				}
 			}
-		}
+			else if (Ref popup = this->getChildByType<FLAlertLayer>(-1)) {
+				popup->onBtn1(popup);
+			}
+			else {
+				p->pushButton(PlayerButton::Jump);
+				queueInMainThread([=] { p->releaseButton(PlayerButton::Jump); });
+			}
+		};
 	}
 	void handleKeypress(cocos2d::enumKeyCodes key, bool p1) {
 		UILayer::handleKeypress(key, p1);
@@ -429,6 +435,10 @@ class $modify(PlayerObjectExt, PlayerObject) {
 
 				xv = btns[2] or btns[3] ? mVel * m_speedMultiplier : 0.f;
 				xv = btns[2] ? -fabs(xv) : fabs(xv);
+
+				if (isMoving) {
+					p0 = btns[5] ? p0 * 2 : p0;
+				}
 			};
 
 			auto asd = CCArrayExt<CCParticleSystemQuad*>(this->m_particleSystems);

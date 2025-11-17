@@ -1,7 +1,6 @@
 #include <Geode/Geode.hpp>
 using namespace geode::prelude;
 
-
 #include <Geode/modify/CCMenuItemSpriteExtra.hpp>
 class $modify(CCMenuItemSpriteExtraExt, CCMenuItemSpriteExtra) {
 	$override void selected() {

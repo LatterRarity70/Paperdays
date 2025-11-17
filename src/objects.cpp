@@ -3,7 +3,6 @@
 
 #define saves getMod()->getSaveContainer
 
-
 #include <Geode/modify/GJGameLoadingLayer.hpp>
 class $modify(GJGameLoadingLayerWhatTheF, GJGameLoadingLayer) {
 	inline static Ref<EditLevelLayer> sex;
@@ -56,6 +55,32 @@ class $modify(DialogsTextAreaFixExt, TextArea) {
 			str, font, scale, width, //220.f
 			anchor, lineHeight, disableColor
 		);
+	}
+};
+
+#include <Geode/modify/CCActionInterval.hpp>
+class $modify(DialogTextAnimExt, CCActionInterval) {
+	$override void startWithTarget(CCNode * p0) {
+		//log::debug("{}->{}({})", this, __FUNCTION__, p0);
+		//CCFadeIn, ::startWithTarget({ CCFontSprite, 
+		if (typeinfo_cast<CCFadeIn*>(this)) if (typeinfo_cast<CCFontSprite*>(p0)) {
+			Ref fade = typeinfo_cast<CCFadeIn*>(this);
+			Ref sprite = typeinfo_cast<CCFontSprite*>(p0);
+			if (sprite) sprite->runAction(CCSequence::createWithTwoActions(
+				CCDelayTime::create(fade ? fade->getDuration() : 0.1f), CallFuncExt::create(
+					[sprite] {
+						if (!sprite) return;
+						sprite->setVisible(1);
+						sprite->setOpacity(255);
+						if (not sprite->getContentSize().isZero()) {
+							FMODAudioEngine::get()->playEffect("_text.ogg"_spr);
+						};
+					}
+				)
+			));
+			return;
+		}
+		return CCActionInterval::startWithTarget(p0);
 	}
 };
 
@@ -213,6 +238,18 @@ inline void SetupObjects() {
 						}
 					);
 					popup->m_buttonMenu->addChild(input);
+
+					auto dmpinf = CCMenuItemExt::createSpriteExtra(
+						ButtonSprite::create("dump"), [](void*) {
+							MDPopup::create(
+								"Save container dump",
+								"```\n" + getMod()->getSaveContainer().dump() + "\n```",
+								"oh wow ok, fk..."
+							)->show();
+						}
+					);
+					dmpinf->setPosition({ 116.000f, 196.000f });
+					popup->m_buttonMenu->addChild(dmpinf);
 				}
 			);
 			return false;
@@ -818,6 +855,10 @@ class $modify(DialogTrigger, DialogLayer) {
 	bool init(DialogObject* object, cocos2d::CCArray* objects, int background) {
 		m_delegate = m_delegate ? m_delegate : Delegate::s_pForNextDialogLayer;
 		if (!DialogLayer::init(object, objects, background)) return false;
+		if (this) this->runAction(CCSequence::createWithTwoActions(
+			CCDelayTime::create(0.1f), CallFuncExt::create(
+				[_this = Ref(this)] { _this->m_handleTap = (1); }
+			)));
 		return true;
 	};
 
