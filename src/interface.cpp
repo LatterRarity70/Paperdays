@@ -759,6 +759,23 @@ class $modify(NodeVisitController, CCNode) {
 			if (Ref a = Ref(this)->getChildByID("songs-button")) a->setVisible(0);
 			if (Ref a = Ref(this)->getChildByID("help-button")) a->setVisible(0);
 			Ref(this)->setUserObject("done"_spr, this);
+			if (fileExistsInSearchPaths(string::pathToString(CMAKE_CURRENT_LIST_FILE).c_str())) {
+				Ref input = TextInput::create(30.f, "lvl");
+				input->setString(saves()["level"].dump());
+				input->getInputNode()->m_cursor->setString("   level   \n \n \n");
+				input->setCallback(
+					[input](const std::string& p0) {
+						input->getInputNode()->m_cursor->setString("   level   \n \n \n");
+						auto parse = matjson::parse(p0);
+						if (auto err = parse.err()) input->getInputNode()->m_cursor->setString(
+							fmt::format("\n \n \n {}", err.value()).c_str()
+						);
+						else saves()["level"] = parse.unwrapOrDefault();
+					}
+				);
+				input->setPosition({ 0, 0 });
+				Ref(this)->CCNode::addChild(input);
+			}
 		}
 	}
 };

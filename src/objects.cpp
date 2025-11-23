@@ -28,33 +28,21 @@ class $modify(GJGameLoadingLayerWhatTheF, GJGameLoadingLayer) {
 		if (!this) return;
 		if (!typeinfo_cast<GJGameLoadingLayer*>(this)) return;
 		if (this->m_level) {
-			GameManager::get()->playMenuMusic();
-			this->addChild(geode::createLayerBG());
 			this->scheduleOnce(schedule_selector(GJGameLoadingLayerWhatTheF::xd), 5.f);
-			auto text = CCLabelBMFont::create("-_-", "chatFont.fnt");
-			text->setOpacity(0);
-			text->runAction(CCFadeIn::create(5.f));
-			text->setAlignment(kCCTextAlignmentCenter);
-			text->setPosition(this->getContentSize() / 2);
-			limitNodeSize(text, this->getContentSize(), 0.6f, 0.3f);
-			this->addChild(text);
 		}
 	};
 };
 
-#include <Geode/modify/TextArea.hpp>
-class $modify(DialogsTextAreaFixExt, TextArea) {
-	inline static bool EnableForNext = false;
-	static TextArea* create(
-		gd::string str, char const* font, float scale, float width,
-		cocos2d::CCPoint anchor, float lineHeight, bool disableColor
-	) {
-		//if (EnableForNext) width = 282.000f;
-		//EnableForNext = false;
-		return TextArea::create(
-			str, font, scale, width, //220.f
-			anchor, lineHeight, disableColor
-		);
+#include <Geode/modify/GameObject.hpp>
+class $modify(GameObjectsExt, GameObject) {
+	virtual void customSetup() {
+		GameObject::customSetup();
+		if (this and typeinfo_cast<GameObject*>(this)) {
+			if (auto tex = this->getTexture())
+				tex->setAliasTexParameters();
+			if (auto g = this->getGrid())
+				if (auto t = g->m_pTexture) t->setAliasTexParameters();
+		};
 	}
 };
 
@@ -346,8 +334,8 @@ class $modify(DialogTrigger, DialogLayer) {
 		inline static Delegate* s_pForNextDialogLayer;
 		CREATE_FUNC(Delegate);
 
-		DialogLayer* m_dialogLayer = nullptr;
-		GJBaseGameLayer* m_game = nullptr;
+		Ref<DialogLayer> m_dialogLayer;
+		Ref<GJBaseGameLayer> m_game;
 		std::string m_replacedTextures = "";
 		virtual void dialogClosed(DialogLayer* p0) {
 			m_dialogLayer = nullptr;
@@ -475,6 +463,12 @@ class $modify(DialogTrigger, DialogLayer) {
 						}
 						if (auto a = "!py:"; string::startsWith(text, a)) {
 							py = utils::numFromString<float>(
+								string::replace(text, a, "")
+							).unwrapOrDefault();
+							continue;
+						}
+						if (auto a = "!anim:"; string::startsWith(text, a)) {
+							animate = utils::numFromString<int>(
 								string::replace(text, a, "")
 							).unwrapOrDefault();
 							continue;
@@ -653,15 +647,15 @@ class $modify(DialogTrigger, DialogLayer) {
 
 	void skip(bool close = false) {
 		close ? queueInMainThread(
-			[xd = Ref(this)] { xd->onClose(); }
+			[xd = Ref(this)] { if (xd) xd->onClose(); }
 		) : queueInMainThread(
-			[xd = Ref(this)] { xd->handleDialogTap(); }
+			[xd = Ref(this)] { if (xd) xd->handleDialogTap(); }
 		);
 	};
 
 	bool processDialogObject(DialogObject* object) {
 
-		auto del = typeinfo_cast<Delegate*>(m_delegate);
+		Ref del = typeinfo_cast<Delegate*>(m_delegate);
 		if (!del) return false;
 
 		if (!del->m_game) return false;
@@ -680,7 +674,7 @@ class $modify(DialogTrigger, DialogLayer) {
 		auto& animate = del->animate;
 
 		std::string text = object->m_text.c_str();
-		log::debug("{}", text.c_str());
+		//log::warn("{}", text.c_str());
 
 		if (string::contains(text, "->")) {
 			auto val = string::split(text, "->");
@@ -697,19 +691,29 @@ class $modify(DialogTrigger, DialogLayer) {
 		}
 
 		if (string::startsWith(text, "!levelup")) {
-			if (auto playlayer = GameManager::get()->m_playLayer; playlayer->isRunning()) {
-				playlayer->pauseSchedulerAndActions();
-				saves()["level"] = saves()["level"].asInt().unwrapOr(0) + 1;
-				CCDirector::get()->replaceScene(LevelSelectLayer::scene(0));
+			saves()["level"] = saves()["level"].asInt().unwrapOr(0) + 1;
+			Ref playlayer = typeinfo_cast<PlayLayer*>(del->m_game.data());
+			if (playlayer and playlayer->isRunning()) {
+				if (playlayer) playlayer->pauseGame(0);
+				if (playlayer) playlayer->pauseAudio();
+				if (playlayer) playlayer->removeFromParent();
+				auto a = CCDirector::get();
+				a->replaceScene(CCScene::create());
+				queueInMainThread([a] { a->replaceScene(LevelSelectLayer::scene(0)); });
 			}
 			return true;
 		}
 		if (auto a = "!level:"; string::startsWith(text, a)) {
 			auto id = utils::numFromString<int>(string::replace(text, a, "")).unwrapOrDefault();
 			saves()["level"] = id;
-			if (auto playlayer = GameManager::get()->m_playLayer; playlayer->isRunning()) {
-				playlayer->pauseSchedulerAndActions();
-				CCDirector::get()->replaceScene(LevelSelectLayer::scene(0));
+			Ref playlayer = typeinfo_cast<PlayLayer*>(del->m_game.data());
+			if (playlayer and playlayer->isRunning()) {
+				if (playlayer) playlayer->pauseGame(0);
+				if (playlayer) playlayer->pauseAudio();
+				if (playlayer) playlayer->removeFromParent();
+				auto a = CCDirector::get();
+				a->replaceScene(CCScene::create());
+				queueInMainThread([a] { a->replaceScene(LevelSelectLayer::scene(0)); });
 			}
 			return true;
 		}
@@ -800,11 +804,18 @@ class $modify(DialogTrigger, DialogLayer) {
 					title.c_str(), cap.c_str(),
 					btn1.empty() ? nullptr : btn1.c_str(),
 					btn2.empty() ? nullptr : btn2.c_str(),
-					[game = Ref(del->m_game), del = Ref(del), group1, group2](void* a, bool btn2) {
-						del->dialogClosed((DialogLayer*)a);
+					[_ = Ref(this), object = Ref(object), 
+					game = Ref(del->m_game), del = Ref(del), 
+					group1, group2](CCNode* a, bool btn2) {
+						del->dialogClosed(nullptr);
 						if (game) game->spawnGroup(
 							btn2 ? group2 : group1, false, 0, gd::vector<int>(), -1, -1
 						);
+						if (_) {
+							a->getParent()->addChild(_);
+							_->setUserObject("call-org-display", object);
+							_->skip();
+						}
 					}
 				);
 				CCDirector::get()->m_pRunningScene = scene;
@@ -826,8 +837,10 @@ class $modify(DialogTrigger, DialogLayer) {
 				if (px.has_value()) ptmp.x = px.value();
 				if (py.has_value()) ptmp.y = py.value();
 				popup->m_mainLayer->setAnchorPoint(ptmp);
+
 			}
 
+			setUserObject("dont-skip", object);
 			return true;
 		}
 
@@ -849,7 +862,15 @@ class $modify(DialogTrigger, DialogLayer) {
 	}
 
 	void displayDialogObject(DialogObject* object) {
-		processDialogObject(object) ? skip() : DialogLayer::displayDialogObject(object);
+		if (getUserObject("call-org-display") == object) {
+			return DialogLayer::displayDialogObject(object);
+		}
+		if (processDialogObject(object)) {
+			if (getUserObject("dont-skip") == object) queueInMainThread(
+				[xd = Ref(this)] { xd->removeFromParentAndCleanup(false); }
+			); else skip();
+		}
+		else DialogLayer::displayDialogObject(object);
 	};
 
 	bool init(DialogObject* object, cocos2d::CCArray* objects, int background) {
