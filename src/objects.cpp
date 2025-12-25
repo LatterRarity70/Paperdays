@@ -5,30 +5,12 @@
 
 #include <Geode/modify/GJGameLoadingLayer.hpp>
 class $modify(GJGameLoadingLayerWhatTheF, GJGameLoadingLayer) {
-	inline static Ref<EditLevelLayer> sex;
-	void xdddd(float) {
-		if (!sex) return;
-		if (!this) return;
-		if (!typeinfo_cast<GJGameLoadingLayer*>(this)) return;
-		if (!this->isRunning()) return;
-		this->m_editor ? sex->onEdit(sex) : sex->onPlay(sex);
-	}
-	void xd(float) {
-		if (!this) return;
-		if (!typeinfo_cast<GJGameLoadingLayer*>(this)) return;
-		if (!this->isRunning()) return;
-		if (this->m_level) {
-			sex = EditLevelLayer::create(this->m_level);
-			this->getParent()->addChild(sex, -999);
-			this->scheduleOnce(schedule_selector(GJGameLoadingLayerWhatTheF::xdddd), 0.01f);
-		}
-	}
 	virtual void onEnter() {
 		GJGameLoadingLayer::onEnter();
 		if (!this) return;
 		if (!typeinfo_cast<GJGameLoadingLayer*>(this)) return;
 		if (this->m_level) {
-			this->scheduleOnce(schedule_selector(GJGameLoadingLayerWhatTheF::xd), 5.f);
+			loadLevel();
 		}
 	};
 };
@@ -104,7 +86,7 @@ void SetupObjects();
 $on_mod(Loaded) { SetupObjects(); }
 inline void SetupObjects() {
 	static auto plrinputtrigger = GameObjectsFactory::createTriggerConfig(
-		UNIQ_ID("pd-plr-input-crtl"), "edit_eEventLinkBtn_001.png",
+		UNIQ_ID("pd-plr-input-crtl"), "pd-plr-input-crtl.png"_spr,
 		[](EffectGameObject* object, GJBaseGameLayer* game, int, gd::vector<int> const*) {
 			GameOptionsTrigger* options = typeinfo_cast<GameOptionsTrigger*>(object);
 			if (!options) return log::error("options object cast == {} from {}", options, object);
@@ -169,7 +151,7 @@ inline void SetupObjects() {
 			);
 			return false;
 		}
-	);
+	)->customSetup([](GameObject* a) { if (a) a->m_addToNodeContainer = true; });
 	plrinputtrigger->registerMe();
 
 	static GameObjectsFactory::GameObjectConfig* svcondtrigger = GameObjectsFactory::createTriggerConfig(
@@ -367,7 +349,7 @@ class $modify(DialogTrigger, DialogLayer) {
 
 		GameObjectsFactory::registerGameObject(GameObjectsFactory::createTriggerConfig(
 			UNIQ_ID("papperdays-dialog-trigger"),
-			"edit_eEventLinkBtn_001.png",
+			"dialog-trigger.png"_spr,
 			[](EffectGameObject* trigger, GJBaseGameLayer* game, int p1, gd::vector<int> const* p2)
 			{
 				if (!trigger) return;
@@ -605,6 +587,7 @@ class $modify(DialogTrigger, DialogLayer) {
 			[](GameObject* object)
 			{
 				if (!object) return object;
+				object->m_addToNodeContainer = true;
 				object->setUserObject("dialog-delegate", Delegate::create());
 				auto data = CCNode::create();
 				object->setUserObject("data"_spr, data);
@@ -985,7 +968,7 @@ class $modify(MenuItemGameObject, EffectGameObject) {
 
 	static void setup() {
 		conf = GameObjectsFactory::createRingConfig(
-			UNIQ_ID("menu-item"), ""
+			UNIQ_ID("menu-item"), "menu-item.png"_spr
 		)->refID(3640)->tab(12)->insertIndex((12 * 6) + 3)->onEditObject(
 			[](EditorUI* a, GameObject* aa) -> bool {
 				queueInMainThread(
@@ -1018,6 +1001,7 @@ class $modify(MenuItemGameObject, EffectGameObject) {
 			}
 		)->customSetup(
 			[](GameObject* object) {
+				object->m_addToNodeContainer = true;
 				object->m_outerSectionIndex = -1;
 				object->m_isInvisible = false;
 				object->setDisplayFrame(object->m_editorEnabled ? 
@@ -1206,5 +1190,60 @@ class $modify(SelectEventLayerKeysExt, SelectEventLayer) {
 		Ref(this)->m_buttonMenu->addChild(keyEventsExpandBtn);
 
 		return true;
+	}
+};
+
+
+#include <Geode/modify/CustomizeObjectLayer.hpp>
+class $modify(CustomizeObjectLayerExt, CustomizeObjectLayer) {
+	bool init(GameObject * object, cocos2d::CCArray * objects) {
+		if (!CustomizeObjectLayer::init(object, objects)) return false;
+		if (auto a = m_mainLayer->getChildByType<CCScale9Sprite>(0)) a->setOpacity(0);
+		return true;
+	}
+};
+
+#include <Geode/modify/TextGameObject.hpp>
+class $modify(TextGameObjectImageExt, TextGameObject) {
+	CCSpriteFrame* tryGetSpriteFrame() {
+		auto name = std::string(m_text.c_str());
+		if (fileExistsInSearchPaths(name.c_str())) {
+			auto spr = CCSprite::create(name.c_str());
+			return (spr ? spr : CCSprite::create())->displayFrame();
+		}
+		if (CCSpriteFrameCache::get()->m_pSpriteFrames->objectForKey(name.c_str())) {
+			auto spr = CCSprite::createWithSpriteFrameName(name.c_str());
+			return (spr ? spr : CCSprite::create())->displayFrame();
+		}
+		return nullptr;
+	}
+	void trySetupCustomSprite() {
+		if (auto frame = tryGetSpriteFrame()) {
+			for (auto c : getChildrenExt()) c->setVisible(false);
+			this->removeChildByTag("image"_h);
+
+			auto image = CCSprite::createWithSpriteFrame(frame);
+			image->setPosition(this->getContentSize() / 2);
+			image->setColor(this->getColor());
+			image->setOpacity(this->getOpacity());
+			this->addChild(image, 1, "image"_h);
+			this->setContentSize(image->getContentSize());
+			m_width = getContentWidth();
+			m_height = getContentHeight();
+			updateOrientedBox();
+		}
+		else {
+			for (auto c : getChildrenExt()) c->setVisible(true);
+			this->removeChildByTag("image"_h);
+		}
+	}
+	void customObjectSetup(gd::vector<gd::string>& p0, gd::vector<void*>& p1) {
+		TextGameObject::customObjectSetup(p0, p1);
+		m_addToNodeContainer = true;
+		trySetupCustomSprite();
+	}
+	void updateTextObject(gd::string p0, bool p1) {
+		TextGameObject::updateTextObject(p0, p1);
+		trySetupCustomSprite();
 	}
 };

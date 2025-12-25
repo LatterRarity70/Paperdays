@@ -1,6 +1,35 @@
 #include <Geode/Geode.hpp>
 using namespace geode::prelude;
 
+#include <Geode/modify/LevelEditorLayer.hpp>
+class $modify(LevelEditorLayerExt, LevelEditorLayer) {
+	void restart(float) {
+		if (Ref a = typeinfo_cast<PlayerObject*>(getUserObject(
+			"playerTookDamage"
+		))) a->m_isLocked = false;
+		onPlaytest();
+	}
+	void onPlaytest() {
+		LevelEditorLayer::onPlaytest();
+		if (Ref a = typeinfo_cast<PlayerObject*>(getUserObject(
+			"playerTookDamage"
+		))) a->playSpawnEffect();
+	}
+	virtual void playerTookDamage(PlayerObject * player) {
+		if (player) {
+			player->releaseAllButtons();
+			player->m_isLocked = true;
+			player->playDeathEffect();
+			this->setUserObject("playerTookDamage", player);
+			this->scheduleOnce(schedule_selector(LevelEditorLayerExt::restart), 0.35f);
+			FMODAudioEngine::get()->playEffect("explode_11.ogg", 1.f, 1.f, 1.f);
+		}
+		else {
+			LevelEditorLayer::playerTookDamage(player);
+		}
+	}
+};
+
 #include <Geode/modify/UILayer.hpp>
 class $modify(UILayerPlayerKeysExt, UILayer) {
 	bool init(GJBaseGameLayer * p0) {
@@ -55,8 +84,8 @@ class $modify(UILayerPlayerKeysExt, UILayer) {
 
 #include <Geode/modify/PlayLayer.hpp>
 class $modify(PlayLayerExt, PlayLayer) {
-	void startMusic() {
-		return getUserObject("audioOnDeath") ? void() : PlayLayer::startMusic();
+	void resetLevel() {
+		PlayLayer::resetLevel();
 	};
 };
 
@@ -64,12 +93,6 @@ class $modify(PlayLayerExt, PlayLayer) {
 class $modify(GJBaseGameLayerEventsExt, GJBaseGameLayer) {
 	void processOptionsTrigger(GameOptionsTrigger * p0) {
 		GJBaseGameLayer::processOptionsTrigger(p0);
-		if (p0->m_audioOnDeath != GameOptionsSetting::Off) {
-			setUserObject("audioOnDeath",
-				p0->m_audioOnDeath == GameOptionsSetting::On ?
-				CCNode::create() : nullptr
-			);
-		};
 	};
 	void gameEventTriggered(GJGameEvent p0, int p1, int p2) {
 		auto eventID = static_cast<int>(p0);
@@ -141,6 +164,7 @@ class $modify(PlayerObjectExt, PlayerObject) {
 			)) frames->addObject(sprite->displayFrame());																		\
 			else log::warn("there is no {}/"#name"{}.png", GEODE_MOD_ID, i);													\
 			name->runAction(CCRepeatForever::create(CCAnimate::create(CCAnimation::createWithSpriteFrames(frames, speed))));	\
+			if (!string::contains(#name, "up_idle")) name->setAnchorPoint(hidep);																														\
 		};																														\
 
 		anim(side_susie_idle, 2, 0.5f);
@@ -208,7 +232,37 @@ class $modify(PlayerObjectExt, PlayerObject) {
 	}
 	void spawnCircle() {
 		m_isDead = false;
-		if (Ref a = m_fields->m_deathSprite) a->resumeSchedulerAndActions();
+		if (Ref spr = m_fields->m_deathSprite) {
+			this->runAction(CCSequence::create(
+				CallFuncExt::create([spr] { //5 frames
+					if (auto a = CCSpriteFrameCache::get()->spriteFrameByName(
+						"side_susie_dare1.png"
+					)) spr->setDisplayFrame(a); }),
+				CCDelayTime::create(0.1f),
+				CallFuncExt::create([spr] {
+					if (auto a = CCSpriteFrameCache::get()->spriteFrameByName(
+						"side_susie_dare2.png"
+					)) spr->setDisplayFrame(a); }),
+				CCDelayTime::create(0.1f),
+				CallFuncExt::create([spr] {
+					if (auto a = CCSpriteFrameCache::get()->spriteFrameByName(
+						"side_susie_dare3.png"
+					)) spr->setDisplayFrame(a); }),
+				CCDelayTime::create(0.1f),
+				CallFuncExt::create([spr] {
+					if (auto a = CCSpriteFrameCache::get()->spriteFrameByName(
+						"side_susie_dare4.png"
+					)) spr->setDisplayFrame(a); }),
+				CCDelayTime::create(0.1f),
+				CallFuncExt::create(
+					[spr, plr = Ref(this)] {
+						if (spr) spr->resumeSchedulerAndActions();
+						if (plr) plr->m_fields->m_deathSprite = nullptr;
+					}
+				),
+				nullptr
+			));
+		}
 	}
 	void ringJump(RingObject* p0, bool p1) {
 		if (m_isSpider) m_holdingButtons[5] ? PlayerObject::ringJump(p0, p1) : void();
@@ -250,20 +304,22 @@ class $modify(PlayerObjectExt, PlayerObject) {
 		Ref spr_player_run = typeinfo_cast<CCSprite*>(this->querySelector("side_susie_run"_spr));
 		Ref spr_player_fall = typeinfo_cast<CCSprite*>(this->querySelector("side_susie_fallingdown"_spr));
 		Ref spr_player_jump = typeinfo_cast<CCSprite*>(this->querySelector("side_susie_flyingup"_spr));
-		if (spr_player_idle and spr_player_run and mainLayer) {
+		if (spr_player_run and mainLayer) {
 			mainLayer->setVisible(!showAnimPlr);
-			//hide all animates
-			cocos::findFirstChildRecursive<CCSprite>(this,
-				[](CCSprite* node) {
-					if (string::contains(node->getID(), GEODE_MOD_ID)) node->setAnchorPoint(hidep);
-					return false;
-				}
-			);
-			//show current state anim
-			;; spr_player_run->setAnchorPoint((showAnimPlr and !isOnAir and !isStanding) ? showp : hidep);
-			; spr_player_idle->setAnchorPoint((showAnimPlr and !isOnAir and isStanding) ? showp : hidep);
-			; spr_player_fall->setAnchorPoint((showAnimPlr and isOnAir and m_yVelocity <= -0.0f) ? showp : hidep);
-			; spr_player_jump->setAnchorPoint((showAnimPlr and isOnAir and m_yVelocity >= 0.0f) ? showp : hidep);
+			if (!m_fields->m_deathSprite) {
+				//hide all animates
+				cocos::findFirstChildRecursive<CCSprite>(this,
+					[](CCSprite* node) {
+						if (string::contains(node->getID(), GEODE_MOD_ID)) node->setAnchorPoint(hidep);
+						return false;
+					}
+				);
+				//show current state anim
+				;; spr_player_run->setAnchorPoint((showAnimPlr and !isOnAir and !isStanding) ? showp : hidep);
+				; spr_player_idle->setAnchorPoint((showAnimPlr and !isOnAir and isStanding) ? showp : hidep);
+				; spr_player_fall->setAnchorPoint((showAnimPlr and isOnAir and m_yVelocity <= -0.0f) ? showp : hidep);
+				; spr_player_jump->setAnchorPoint((showAnimPlr and isOnAir and m_yVelocity >= 0.0f) ? showp : hidep);
+			};
 			auto visible_sprite = cocos::findFirstChildRecursive<CCSprite>(this,
 				[](CCSprite* node) {
 					if (!string::contains(node->getID(), GEODE_MOD_ID)) return false;

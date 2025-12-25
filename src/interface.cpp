@@ -205,9 +205,24 @@ class $modify(MenuLayerExt, MenuLayer) {
 	};
 	bool init() {
 
-		CCFileUtils::get()->m_fullPathCache["menuLoop.mp3"] = CCFileUtils::get()->fullPathForFilename(
-			FLASHES_MODE ? FLASHES_SONG() : "menuLoop.mp3"_spr, 0
-		);
+		if (saves()["level"].asInt().unwrapOr(0) == 4) {
+			FLASHES_MODE = false;
+			CCFileUtils::get()->m_fullPathCache["menuLoop.mp3"] = CCFileUtils::get(
+			)->fullPathForFilename("loading__ 1485147_In-The-Distance.mp3"_spr, 0);
+			CCFileUtils::get()->m_fullPathCache["menuBG_1a.png"] = CCFileUtils::get(
+			)->fullPathForFilename("menuBG_lvl4a.png"_spr, 0);
+			CCFileUtils::get()->m_fullPathCache["menuBG_1b.png"] = CCFileUtils::get(
+			)->fullPathForFilename("menuBG_lvl4b.png"_spr, 0);
+		}
+		else {
+			CCFileUtils::get()->m_fullPathCache.erase("menuLoop.mp3");
+			CCFileUtils::get()->m_fullPathCache.erase("menuBG_1a.png");
+			CCFileUtils::get()->m_fullPathCache.erase("menuBG_1b.png");
+		}
+
+		if (FLASHES_MODE) CCFileUtils::get()->m_fullPathCache[
+			"menuLoop.mp3"
+		] = CCFileUtils::get()->fullPathForFilename(FLASHES_SONG(), 0);
 
 		if (!MenuLayer::init()) return false;
 
@@ -344,22 +359,25 @@ class $modify(MenuLayerExt, MenuLayer) {
 			GameManager::get()->fadeInMusic("hi.mp3");
 		}
 
-		CCFileUtils::get()->m_fullPathCache["GJ_gradientBG.png"] = CCFileUtils::get()->fullPathForFilename("menuBG_1.png", 0);
-		auto bg = geode::createLayerBG();
+		CCFileUtils::get()->m_fullPathCache["GJ_gradientBG.png"] = CCFileUtils::get()->fullPathForFilename(
+			"menuBG_1a.png", 0
+		);
+		Ref bg = geode::createLayerBG();
 		CCFileUtils::get()->m_fullPathCache.erase("GJ_gradientBG.png");
 		bg->setColor(ccWHITE);
 		addChild(bg);
-		auto bganim1 = CCSprite::create("menuBG_1.png");
-		auto bganim2 = CCSprite::create("menuBG_11.png");
+		Ref bganim1 = CCSprite::create("menuBG_1a.png");
+		Ref bganim2 = CCSprite::create("menuBG_1b.png");
 		bg->runAction(CCRepeatForever::create(CCSequence::create(
 			CCDelayTime::create(1.0f),
-			CallFuncExt::create([bg = Ref(bg), anim = Ref(bganim2)] { bg->setDisplayFrame(anim->displayFrame()); }),
+			CallFuncExt::create([=] { bg->setDisplayFrame(bganim2->displayFrame()); }),
 			CCDelayTime::create(1.0f),
-			CallFuncExt::create([bg = Ref(bg), anim = Ref(bganim1)] { bg->setDisplayFrame(anim->displayFrame()); }),
+			CallFuncExt::create([=] { bg->setDisplayFrame(bganim1->displayFrame()); }),
 			nullptr
 		)));
 
-		CCFileUtils::get()->m_fullPathCache["GJ_gradientBG.png"] = CCFileUtils::get()->fullPathForFilename("flashes1.png", 0);
+		CCFileUtils::get()->m_fullPathCache["GJ_gradientBG.png"] = CCFileUtils::get(
+		)->fullPathForFilename("flashes1.png", 0);
 		auto flashes = geode::createLayerBG();
 		CCFileUtils::get()->m_fullPathCache.erase("GJ_gradientBG.png");
 		flashes->setColor(ccWHITE);
@@ -511,7 +529,8 @@ void main(void) {
 			}
 		}
 
-		CCFileUtils::get()->m_fullPathCache["GJ_gradientBG.png"] = CCFileUtils::get()->fullPathForFilename("menuBG_2.png", 0);
+		CCFileUtils::get()->m_fullPathCache["GJ_gradientBG.png"] = CCFileUtils::get(
+		)->fullPathForFilename("menuBG_2.png", 0);
 		auto menubg = geode::createLayerBG();
 		CCFileUtils::get()->m_fullPathCache.erase("GJ_gradientBG.png");
 		addChild(menubg);
