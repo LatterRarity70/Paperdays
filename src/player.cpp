@@ -74,10 +74,56 @@ class $modify(UILayerPlayerKeysExt, UILayer) {
 			}
 		};
 	}
+	void handleSkaChaCha() {
+		FMODAudioEngine::get()->playEffect("OM_SkaChaChaRemix.mp3");
+		//OM_SkaChaChaRemix.mp3
+		static CCRepeatForever* anim = nullptr;
+		static CCSprite* animatedSprite = nullptr;
+		if (anim) {
+			FMODAudioEngine::get()->stopAllEffects();
+			this->stopAction(anim);
+			CC_SAFE_RELEASE_NULL(anim);
+			if (animatedSprite) animatedSprite->resumeSchedulerAndActions();
+			return;
+		}
+		Ref plr = m_gameLayer->m_player1;
+		animatedSprite = cocos::findFirstChildRecursive<CCSprite>(plr,
+			[](CCSprite* node) {
+				if (!string::contains(node->getID(), GEODE_MOD_ID)) return false;
+				return node->getAnchorPoint().equals({ 0.5f, 0.5f });
+			}
+		);
+		if (Ref spr = animatedSprite) {
+			spr->pauseSchedulerAndActions();
+			auto pos = plr->m_position;
+			auto acts = CCArrayExt<CCAction>();
+			//suzie_skachacha64.png, 10fps
+			for (int i = 1; i <= 64; i++) {
+				acts.push_back(CallFuncExt::create(
+					[spr, i, plr, pos, _this = Ref(this)] {
+						if (auto a = CCSpriteFrameCache::get()->spriteFrameByName(
+							fmt::format("suzie_skachacha{}.png", i).c_str()
+						)) spr->setDisplayFrame(a);
+						if (!plr->m_position.equals(pos)) queueInMainThread([=] {
+							FMODAudioEngine::get()->stopAllEffects();
+							_this->stopAction(anim);
+							CC_SAFE_RELEASE_NULL(anim);
+							spr->resumeSchedulerAndActions();
+							return;
+							});
+					}
+				));
+				acts.push_back(CCDelayTime::create(0.1f));
+			}
+			anim = CCRepeatForever::create(CCSequence::create(acts.inner()));
+			this->runAction(anim);
+		}
+	}
 	void handleKeypress(cocos2d::enumKeyCodes key, bool p1) {
 		UILayer::handleKeypress(key, p1);
 		downButtonUpdate(key, p1);
 		actionButtonUpdate(key, p1);
+		if (key == KEY_E and !p1) handleSkaChaCha();
 		//log::error("{} -> {}", CCKeyboardDispatcher::get()->keyToString(key), p1);
 	}
 };
@@ -528,8 +574,6 @@ class $modify(PlayerObjectExt, PlayerObject) {
 		};
 	};
 };
-
-
 
 // https://github.com/Kingminer7/PlatformerJoystick/blob/main/src/JoystickNode.hpp
 // why reinvent the wheel ya? anyways i just getting away from dependencies
