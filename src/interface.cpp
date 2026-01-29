@@ -171,7 +171,7 @@ class $modify(MenuLayerExt, MenuLayer) {
 		static auto killgame = false;
 		if (killgame) {
 			getMod()->saveData();
-			game::exit();
+			game::exit(true);
 		}
 		auto ragebaited = saves()["ragebaited"].asInt().unwrapOr(0);
 		auto ragebait_answered = saves()["ragebait_answered"].asBool().unwrapOr(false);

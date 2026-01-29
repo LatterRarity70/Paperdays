@@ -1,9 +1,9 @@
 {
-	"geode": "4.10.0",
+	"geode": "5.0.0-alpha.1",
 	"early-load": true,
 	"gd": {
-		"win": "2.2074",
-		"android": "2.2074"
+		"win": "2.2081",
+		"android": "2.2081"
 	},
 	"id": "lr70.paperdays",
 	"name": "\tPaperdays",
