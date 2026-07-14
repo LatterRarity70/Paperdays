@@ -36,6 +36,19 @@ class $modify(UILayerPlayerKeysExt, UILayer) {
 		if (!UILayer::init(p0)) return false;
 		return true;
 	};
+	bool upButtonUpdate(enumKeyCodes key, bool p1) {
+		auto asd = false;
+		asd = key == CONTROLLER_LTHUMBSTICK_UP ? true : asd;
+		asd = key == CONTROLLER_RTHUMBSTICK_UP ? true : asd;
+		asd = key == CONTROLLER_Up ? true : asd;
+		asd = key == KEY_ArrowUp ? true : asd;
+		asd = key == KEY_Up ? true : asd;
+		asd = key == KEY_W ? true : asd;
+		if (!asd) return false;
+		if (!m_gameLayer->m_player1->m_isSpider) return false;
+		m_gameLayer->m_player1->m_holdingButtons[6] = p1;
+		return true;
+	}
 	void downButtonUpdate(enumKeyCodes key, bool p1) {
 		auto asd = false;
 		asd = key == CONTROLLER_LTHUMBSTICK_DOWN ? true : asd;
@@ -120,7 +133,7 @@ class $modify(UILayerPlayerKeysExt, UILayer) {
 		}
 	}
 	void handleKeypress(cocos2d::enumKeyCodes key, bool p1) {
-		UILayer::handleKeypress(key, p1);
+		if (!upButtonUpdate(key, p1)) UILayer::handleKeypress(key, p1);
 		downButtonUpdate(key, p1);
 		actionButtonUpdate(key, p1);
 		if (key == KEY_E and !p1) handleSkaChaCha();
@@ -323,8 +336,9 @@ class $modify(PlayerObjectExt, PlayerObject) {
 		}
 	}
 	void ringJump(RingObject * p0, bool p1) {
-		if (m_isSpider) m_holdingButtons[5] ? PlayerObject::ringJump(p0, p1) : void();
-		else PlayerObject::ringJump(p0, p1);
+		//if (m_isSpider) m_holdingButtons[5] ? PlayerObject::ringJump(p0, p1) : void();
+		//else 
+		PlayerObject::ringJump(p0, p1);
 	};
 	void update(float p0) {
 
@@ -546,14 +560,14 @@ class $modify(PlayerObjectExt, PlayerObject) {
 
 				auto mVel = 0.5f;
 
-				yv = btns[0] or btns[1] ? mVel * m_speedMultiplier : 0.f;
+				yv = btns[0] or btns[6] ? mVel * m_speedMultiplier : 0.f;
 				yv = btns[0] ? -fabs(yv) : fabs(yv);
 
 				xv = btns[2] or btns[3] ? mVel * m_speedMultiplier : 0.f;
 				xv = btns[2] ? -fabs(xv) : fabs(xv);
 
 				if (isMoving) {
-					p0 = btns[5] ? p0 * 2 : p0;
+					p0 = btns[1] ? p0 * 2 : p0;
 				}
 			};
 
@@ -684,15 +698,10 @@ public:
 		if (input.x == 1) layer->queueButton(3, true, false);
 		else if (input.x == -1) layer->queueButton(2, true, false);
 		//y
-		if (old.y == 1) layer->queueButton(1, false, false);
+		if (old.y == 1) ui->handleKeypress(KEY_W, false);
 		else if (old.y == -1) ui->handleKeypress(KEY_S, false);
-		if (input.y == 1) layer->queueButton(1, true, false);
-		else if (input.y == -1) ui->handleKeypress(KEY_S, true);
-		//action
-		if (old.equals(input)) {
-			ui->handleKeypress(KEY_Z, 1);
-			queueInMainThread([=] { if (ui) ui->handleKeypress(KEY_Z, 0); });
-		}
+		if (input.y == 1) ui->handleKeypress(KEY_W, true);
+		else if (input.y == -1) ui->handleKeypress(KEY_S, true); 
 	};
 	void fakePosition() {
 		CCPoint pos = getContentSize() / 2 + m_currentInput * getContentWidth() / 2;
