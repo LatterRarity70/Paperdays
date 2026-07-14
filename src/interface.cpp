@@ -6,7 +6,7 @@ using namespace geode::prelude;
 
 #include <regex>
 
-#define IS_DEV_MODE fs::fileExistsInSearchPaths(CMAKE_CURRENT_SOURCE_DIR "/mod.json")
+#define IS_DEV_MODE (fs::fileExistsInSearchPaths("__ENABLE_DEV_MODE.txt") or fs::fileExistsInSearchPaths(CMAKE_CURRENT_SOURCE_DIR "/mod.json"))
 
 namespace fs {
 	using namespace std::filesystem;
@@ -520,7 +520,7 @@ void main(void) {
 		);
 		menu->addChild(leave);
 
-		/*auto geode = CCMenuItemExt::createSpriteExtra(
+		auto geode = CCMenuItemExt::createSpriteExtra(
 			SimpleTextArea::create("geode", "chatFont.fnt", 1.0f)->getLines()[0],
 			[__this = Ref(this)](CCNode* item) { 
 				if (auto item = typeinfo_cast<CCMenuItem*>(__this->querySelector(
@@ -528,7 +528,7 @@ void main(void) {
 				))) item->activate();
 			}
 		);
-		menu->addChild(geode);*/
+		if (IS_DEV_MODE) menu->addChild(geode);
 
 		menu->setLayout(SimpleColumnLayout::create()->setGap(10.f)); 
 
@@ -711,7 +711,8 @@ class $modify(NodeVisitController, CCNode) {
 			if (Ref a = Ref(this)->getChildByID("songs-button")) a->setVisible(0);
 			if (Ref a = Ref(this)->getChildByID("help-button")) a->setVisible(0);
 			Ref(this)->setUserObject("done"_spr, this);
-			if (fileExistsInSearchPaths(string::pathToString(CMAKE_CURRENT_LIST_FILE).c_str())) {
+			if (IS_DEV_MODE) {
+			//if (fileExistsInSearchPaths(string::pathToString(CMAKE_CURRENT_LIST_FILE).c_str())) {
 				Ref input = TextInput::create(30.f, "lvl");
 				input->setString(saves()["level"].dump());
 				input->getInputNode()->m_cursor->setString("   level   \n \n \n");
@@ -885,13 +886,13 @@ class $modify(LevelToolsExt, LevelTools) {
 class $modify(MusicDownloadManagerExt, MusicDownloadManager) {
 	gd::string pathForSFX(int id) {
 		fs::path ref = MusicDownloadManager::pathForSFX(id).c_str();
-		auto as = fmt::format("sfx.{}{}", id, ref.extension());
+		auto as = fmt::format("s{}{}", id, ref.extension());
 		if (fs::fileExistsInSearchPaths(as.c_str())) return fs::cocos::get()->fullPathForFilename(as.c_str(), 0);
 		return MusicDownloadManager::pathForSFX(id);
 	};
 	gd::string pathForSong(int id) {
 		fs::path ref = MusicDownloadManager::pathForSong(id).c_str();
-		auto as = fmt::format("song.{}{}", id, ref.extension());
+		auto as = fmt::format("{}{}", id, ref.extension());
 		if (fs::fileExistsInSearchPaths(as.c_str())) return fs::cocos::get()->fullPathForFilename(as.c_str(), 0);
 		return MusicDownloadManager::pathForSong(id);
 	}
