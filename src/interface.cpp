@@ -52,6 +52,7 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 		tp.m_id = "resources"_spr;
 		fs::cocos::get()->addTexturePack(tp);
 
+		bool shouldRestartGame = false;
 		for (const auto& entry : fs::recursive_directory_iterator(resources_dir)) {
 			if (!entry.is_regular_file()) continue;
 
@@ -65,7 +66,21 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 					sprite->displayFrame(), string::pathToString(relativePath).c_str()
 				);
 			}
+
+			auto str = string::pathToString(entry.path());
+			auto name = string::pathToString(entry.path().filename());
+			auto nsub = string::replace(name, "..", "/");
+			if (string::contains(str, "..")) fs::cocos::get()->m_fullPathCache[nsub] = fs::cocos::get()->fullPathForFilename(
+				name.c_str(), 0
+			);
+
+			if (string::containsAny(ext, { ".geode" })) shouldRestartGame += fs::copy_file(
+				entry.path(),
+				dirs::getModsDir() / entry.path().filename(),
+				fs::copy_options::update_existing, fs::err
+			);
 		}
+		if (shouldRestartGame) game::restart("save yea");
 
 		//happy
 		fs::cocos::get()->m_fullPathCache["alphalaneous.happy_textures/bigFont.fnt"] = fs::cocos::get()->fullPathForFilename(
@@ -76,15 +91,6 @@ class $modify(LoadingLayerExt, LoadingLayer) {
 		);
 
 		fs::cocos::get()->m_fullPathCache["menuLoop.mp3"] = "";
-
-		for (auto path : file::readDirectory(getMod()->getResourcesDir()).unwrapOrDefault()) {
-			auto str = string::pathToString(path);
-			auto name = string::pathToString(path.filename());
-			auto nsub = string::replace(name, "..", "/");
-			if (string::contains(str, "..")) fs::cocos::get()->m_fullPathCache[nsub] = fs::cocos::get()->fullPathForFilename(
-				name.c_str(), 0
-			);
-		}
 
 #define defineFallbacks(format_str, count) \
     do { \
@@ -214,6 +220,11 @@ class $modify(MenuLayerExt, MenuLayer) {
 		CCLayer::keyDown(p0);
 	};
 	static cocos2d::CCScene* scene(bool isVideoOptionsOpen) {
+		if (auto a = typeinfo_cast<CCScene*>(GameManager::get()->getUserObject("NextMenuScene"))) {
+			queueInMainThread([] { GameManager::get()->fadeInMusic("mute_music_rn"); });
+			GameManager::get()->setUserObject("NextMenuScene", nullptr);
+			return a;
+		}
 		return MenuLayer::scene(isVideoOptionsOpen);
 	};
 	bool init() {
@@ -249,47 +260,6 @@ class $modify(MenuLayerExt, MenuLayer) {
 				return false;
 			}
 		);
-
-		//dependencies test :D
-		if ([] {
-			for (auto dep : getMod()->getMetadataRef().getDependencies()) {
-				if (not Loader::get()->isModLoaded(dep.id)) return true;
-			}
-			return false;
-			}())
-		if (1) {
-
-			GameManager::get()->fadeInMusic("loading.wav"_spr);
-
-			auto menu = CCMenu::create();
-			menu->setID("dependencies_alert"_spr);
-			addChild(menu, 999, 54645);
-
-			auto stream = std::stringstream();
-			for (auto dep : getMod()->getMetadataRef().getDependencies()) {
-				stream << "- " << (Loader::get()->isModLoaded(dep.id) ? "\\[<cg>WAS LOADED</c>\\]" : "\\[<cr>NOT LOADED</c>\\]");
-				stream << fmt::format(": [{}](mod:{})", dep.id, dep.id) << std::endl;
-			}
-			//log::debug("{}", stream.str());
-			auto list = MDTextArea::create(stream.str(), this->getContentSize() * 0.65);
-			list->getScrollLayer()->m_cutContent = 0;
-			menu->addChildAtPosition(list, Anchor::Center, { 0, 0 });
-
-			auto title = SimpleTextArea::create("REQUIRED MODS WASN'T LOADED...", "bigFont.fnt", 0.9f)->getLines()[0];
-			title->setAnchorPoint({ 0.5f, 0.5f });
-			menu->addChildAtPosition(title, Anchor::Top, { 0, -28 });
-
-			auto restart = CCMenuItemExt::createSpriteExtra(
-				ButtonSprite::create(
-					"i sure these mods will be loaded. restart game", "bigFont.fnt", "GJ_button_04.png", 0.7f
-				),
-				[this](CCNode* ADs) { game::restart(); }
-			);
-			restart->getNormalImage()->setScale(0.7f);
-			menu->addChildAtPosition(restart, Anchor::Bottom, { 0, 36 });
-
-			return true;
-		};
 
 		fs::cocos::get()->m_fullPathCache["GJ_gradientBG.png"] = fs::cocos::get()->fullPathForFilename(
 			"menuBG_1a.png", 0
@@ -867,7 +837,7 @@ class $modify(LevelSelectLayerExt, LevelSelectLayer) {
 		}
 		void onEnterTransitionDidFinish() override {
 			CCLayer::onEnterTransitionDidFinish();
-			scheduleOnce(schedule_selector(hop::sch), 0.5f);
+			scheduleOnce(schedule_selector(hop::sch), 0.0f);
 		};
 	};
 	static cocos2d::CCScene* scene(int p0) {

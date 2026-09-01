@@ -16,12 +16,6 @@
 		"homepage": "https://t.me/lil2kki_ch",
 		"source": "https://github.com/lil2kki/Paperdays"
 	},
-	"dependencies": {
-		"geode.node-ids": {
-			"version": ">=v1.13.1",
-			"importance": "suggested"
-		}
-	},
 	"resources": {
 		"fonts": {
 			"bigFont": {

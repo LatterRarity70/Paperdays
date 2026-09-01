@@ -32,10 +32,6 @@ class $modify(LevelEditorLayerExt, LevelEditorLayer) {
 
 #include <Geode/modify/UILayer.hpp>
 class $modify(UILayerPlayerKeysExt, UILayer) {
-	bool init(GJBaseGameLayer * p0) {
-		if (!UILayer::init(p0)) return false;
-		return true;
-	};
 	bool upButtonUpdate(enumKeyCodes key, bool p1) {
 		auto asd = false;
 		asd = key == CONTROLLER_LTHUMBSTICK_UP ? true : asd;
@@ -47,6 +43,7 @@ class $modify(UILayerPlayerKeysExt, UILayer) {
 		if (!asd) return false;
 		if (!m_gameLayer->m_player1->m_isSpider) return false;
 		m_gameLayer->m_player1->m_holdingButtons[6] = p1;
+		m_gameLayer->m_player1->m_holdingButtons[5] = !p1;
 		return true;
 	}
 	void downButtonUpdate(enumKeyCodes key, bool p1) {
@@ -88,6 +85,8 @@ class $modify(UILayerPlayerKeysExt, UILayer) {
 		};
 	}
 	void handleSkaChaCha() {
+		Ref plr = m_gameLayer->m_player1;
+		if (not plr->m_isRobot) return;
 		FMODAudioEngine::get()->playEffect("OM_SkaChaChaRemix.mp3");
 		//OM_SkaChaChaRemix.mp3
 		static CCRepeatForever* anim = nullptr;
@@ -99,7 +98,6 @@ class $modify(UILayerPlayerKeysExt, UILayer) {
 			if (animatedSprite) animatedSprite->resumeSchedulerAndActions();
 			return;
 		}
-		Ref plr = m_gameLayer->m_player1;
 		animatedSprite = cocos::findFirstChildRecursive<CCSprite>(plr,
 			[](CCSprite* node) {
 				if (!string::contains(node->getID(), GEODE_MOD_ID)) return false;
@@ -133,11 +131,22 @@ class $modify(UILayerPlayerKeysExt, UILayer) {
 		}
 	}
 	void handleKeypress(cocos2d::enumKeyCodes key, bool p1) {
+		log::error("{} -> {}", CCKeyboardDispatcher::get()->keyToString(key), p1);
 		if (!upButtonUpdate(key, p1)) UILayer::handleKeypress(key, p1);
 		downButtonUpdate(key, p1);
 		actionButtonUpdate(key, p1);
 		if (key == KEY_E and !p1) handleSkaChaCha();
-		//log::error("{} -> {}", CCKeyboardDispatcher::get()->keyToString(key), p1);
+	}
+};
+#include <Geode/modify/CCKeyboardDispatcher.hpp>
+class $modify(UILayerPlayerKeysExtFix, CCKeyboardDispatcher) {
+	bool dispatchKeyboardMSG(enumKeyCodes key, bool isKeyDown, bool isKeyRepeat) {
+		// sents physical KEY_Up, KEY_W 
+		if (GameManager::get()->m_gameLayer)
+			if (GameManager::get()->m_gameLayer->isRunning())
+				if (auto a = GameManager::get()->m_gameLayer->m_uiLayer)
+					if (((UILayerPlayerKeysExt*)a)->upButtonUpdate(key, isKeyDown)) return false;
+		return CCKeyboardDispatcher::dispatchKeyboardMSG(key, isKeyDown, isKeyRepeat);
 	}
 };
 

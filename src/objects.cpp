@@ -690,8 +690,8 @@ class $modify(DialogTrigger, DialogLayer) {
 			saves()["level"] = saves()["level"].asInt().unwrapOr(0) + 1;
 			Ref playlayer = typeinfo_cast<PlayLayer*>(del->m_game.data());
 			if (playlayer and playlayer->isRunning()) {
-				playlayer->pauseGame(0);
-				CCDirector::get()->replaceScene(CCTransitionFade::create(0.01f, LevelSelectLayer::scene(0)));
+				GameManager::get()->setUserObject("NextMenuScene", LevelSelectLayer::scene(0));
+				PauseLayer::create(0)->onQuit(0);
 			}
 			return true;
 		}
@@ -700,8 +700,8 @@ class $modify(DialogTrigger, DialogLayer) {
 			saves()["level"] = id;
 			Ref playlayer = typeinfo_cast<PlayLayer*>(del->m_game.data());
 			if (playlayer and playlayer->isRunning()) {
-				playlayer->pauseGame(0);
-				CCDirector::get()->replaceScene(CCTransitionFade::create(0.01f, LevelSelectLayer::scene(0)));
+				GameManager::get()->setUserObject("NextMenuScene", LevelSelectLayer::scene(0));
+				PauseLayer::create(0)->onQuit(0);
 			}
 			return true;
 		}
